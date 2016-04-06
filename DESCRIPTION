@@ -1,0 +1,27 @@
+Package: pqsfinder
+Type: Package
+Title: Identification of potential quadruplex forming sequences
+Version: 0.99.2
+Authors@R: c(person("Jiri", "Hon", role = c("aut", "cre"), email =
+        "jiri.hon@gmail.com"), person("Matej", "Lexa", role = "ctb",
+        email = "lexa@fi.muni.cz"), person("Tomas", "Martinek", role =
+        "ctb", email = "martinto@fit.vutbr.cz"))
+Author: Jiri Hon, Matej Lexa and Tomas Martinek
+Maintainer: Jiri Hon <jiri.hon@gmail.com>
+Description: The main functionality of the this package is to detect
+        DNA sequence patterns that are likely to fold into an
+        intramolecular G-quadruplex (G4). Unlike many other approaches,
+        this package is able to detect sequences responsible for G4s
+        folded from imperfect G-runs containing bulges or mismatches
+        and as such is more sensitive than competing algorithms.
+License: BSD_2_clause + file LICENSE
+biocViews: MotifDiscovery, SequenceMatching, GeneRegulation
+LazyData: TRUE
+Depends: Biostrings
+Imports: Rcpp (>= 0.12.3), GenomicRanges, IRanges, S4Vectors, methods
+Suggests: BiocStyle, knitr, Gviz, rtracklayer, biomaRt,
+        BSgenome.Hsapiens.UCSC.hg38
+LinkingTo: Rcpp, BH, flowCore
+VignetteBuilder: knitr
+RoxygenNote: 5.0.1
+NeedsCompilation: yes

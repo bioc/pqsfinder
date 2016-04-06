@@ -1,0 +1,369 @@
+---
+title: "pqsfinder: User Guide"
+author: "Jiří Hon, Matej Lexa, Tomáš Martínek"
+date: "`r doc_date()`"
+package: "`r pkg_ver('pqsfinder')`"
+bibliography: pqsfinder.bib
+abstract: >
+  Instructions on how to use `r Biocpkg("pqsfinder")` package for detecting DNA sequence patterns
+  that are likely to fold into an intramolecular G-quadruplex.
+vignette: >
+  %\VignetteIndexEntry{pqsfinder: User Guide}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+output: 
+  BiocStyle::html_document
+---
+
+# Introduction
+
+The main functionality of the `r Biocpkg("pqsfinder")` package is to detect DNA sequence patterns that are likely to fold into an intramolecular G-quadruplex (G4). G4 is a DNA structure that can form as an alternative to the canonical B-DNA. G4s are believed to be involved in regulation of diverse biological processes, such as telomere maintenance, DNA replication, chromatin formation, transcription, recombination or mutation [@maizels_2014; @kejnovsky_etal_2015]. The main idea of our algorithmic approach is based on the fact that G4 structures arise from compact sequence motifs composed of four consecutive and possibly imperfect guanine runs (G-run) interrupted by loops of semi-arbitrary lengths. The algorithm first identifies four consecutive G-run sequences. Subsequently, it examines the potential of such G-runs to form a stable G4 and assigns a corresponding quatitative score to each. Non-overlapping potential quadruplex-forming sequences (PQS) with positive score are then reported.
+
+It is important to note that unlike many other approaches, our algorithm is able to detect sequences responsible for G4s folded from imperfect G-runs containing bulges or mismatches and as such is more sensitive than competing algorithms [^1]. We also believe the presented solution is the most scalable, since it can be easily and quickly customized (see chapter [Customizing detection algorithm](#customizing-detection-algorithm) for details). The program can be made to detect novel or experimental G4 types that might be discovered or studied in future.
+
+[^1]: We have tested `r Biocpkg('pqsfinder')` on experimentally verified G4 sequences. The results of that work are reflected in default settings of searches. Details of these tests will be presented elsewhere. 
+
+For those interested in non-B DNA, we have previously authored a similar package that can be used to search for triplexes, another type of non-B DNA structure. For details, please see `r Biocpkg('triplex')` package landing page.
+
+# G4-quadruplex detection
+
+As usual, before first package use, it is necessary to load the `r Biocpkg("pqsfinder")` package using the following command:
+
+```{r pqsfinder, message=FALSE, warning=FALSE}
+library(pqsfinder)
+```
+
+Identification of potential quadruplex-forming sequences (PQS) in DNA is performed using the `pqsfinder` function. This function has one required parameter representing the studied DNA sequence in the form of a `DNAString` object and several modifying options with predefined values. For complete description, please see `pqsfinder` function man page.
+
+## Basic quadruplex detection
+
+As a simple example, let's find all PQS in a short DNA sequence.
+
+```{r basic_detection, results='hold'}
+seq <- DNAString("TTTTGGGCGGGAGGAGTGGAGTTTTTAACCCCAAAAATTTGGGAGGGTGGGTGGGAGAA")
+pqs <- pqsfinder(seq)
+pqs
+```
+
+Detected PQS are returned in the form of a `PQSViews` class, which represents the basic container for storing a set of views on the same input sequence based on `XStringViews` object from `r Biocpkg("Biostrings")` package. Each PQS in the view is defined by start location, width and score. All these values can be accessed by standard functions `start(x)`, `width(x)`, `strand(x)` and `score(x)` for further manipulation and analysis. For example:
+
+```{r accessors}
+data.frame(b = start(pqs), w = width(pqs), s = strand(pqs), sc = score(pqs))
+```
+
+By default, `pqsfinder` function reports only the locally best non-overlapping PQS, ignoring any other that would overlap it. However, it's possible to get numbers of all overlapping PQS at each position of the input sequence. To achieve that, call `density(x)` function on the `PQSViews` object:[^2]
+
+[^2]: Clusters of overlapping PQS usually have steep edges when the number of neighboring G-runs is low, but could be more spread out in other situations. 
+
+```{r density}
+density(pqs)
+```
+
+The following example shows, how such density vector could be simply visualized along the input sequence using `r Biocpkg('Gviz')` from [Bioconductor](http://www.bioconductor.org/).
+
+```{r density_viz, fig.height=1.5, fig.width=8.0, message=FALSE}
+library(Gviz)
+ss <- DNAStringSet(seq)
+names(ss) <- "chr1"
+dtrack <- DataTrack(
+  start = 1:length(density(pqs)), width = 1, data = density(pqs),
+  chromosome = "chr1", genome = "", name = "density")
+strack <- SequenceTrack(ss, chromosome = "chr1", name = "sequence")
+suppressWarnings(plotTracks(c(dtrack, strack), type = "h"))
+```
+
+## Modifying basic algorithm options
+
+Depending on the particular type of PQS you want to detect, the algorithm options can be tuned to find the PQS effectively and exclusively. The table bellow gives an overview of all basic algorithm options and their descriptions.
+
+Option name      | Description
+-----------------|----------------------------------------
+`strand`         | Strand specification (`+`, `-` or `*`).
+`max_len`        | Maximal total length of PQS.
+`min_score`      | Minimal score of PQS to be reported.
+`run_min_len`    | Minimal length of each PQS run (G-run).
+`run_max_len`    | Maximal length of each PQS run.
+`loop_min_len`   | Minimal length of each PQS inner loop.
+`loop_max_len`   | Maximal length of each PQS inner loop.
+`max_bulges`     | Maximal number of runs containing a bulge.
+`max_mismatches` | Maximal number of runs containing a mismatch.
+`max_defects`    | Maximum number of defects in total (#bulges + #mismatches).
+
+The more you narrow these options in terms of shorter PQS length, narrower run or loop length ranges and lower number of defects, the faster the detection process will be, with a possible loss of sensitivity. 
+
+**Important note:** In each G-run, the algorithm allows at most one type of defect and at least one G-run must be perfect, that means without any defect. Therefore the values of `max_bulges`, `max_mismatches` and `max_defects` must fall into the range from 0 to 3.
+
+**Example 1:** If you are insterested solely in G-quadruplexes with perfect G-runs, just restrict `max_defects` to zero:
+
+```{r perfect_g4, results='hold'}
+pqsfinder(seq, max_defects = 0)
+```
+
+**Example 2:** In case you don't mind defects in G-runs, but you want to report only higher quality PQS, increase `min_score` value:
+
+```{r min_score, results='hold'}
+pqsfinder(seq, min_score = 80)
+```
+
+# Exporting results
+
+As mentioned above, the results of detection are stored in the `PQSViews` object. Because the `PQSViews` class is only an extension of the `XStringViews` class, all operations applied to the `XStringViews` object can also be applied to the `PQSViews` object as well.
+
+Additionaly, `PQSViews` class supports a conversion mechanism to create `GRanges` objects. Thus, all detected PQS can be easily transformed into elements of a `GRanges` object and saved as a GFF3 file, for example.
+
+## GRanges conversion and export to GFF3
+
+In this example, the output of the `pqsfinder` function will be stored in a `GRanges` object and subsequently exported as a GFF3 file. At first, let's do the conversion using the following command:
+
+```{r granges_conversion}
+gr <- as(pqs, "GRanges")
+gr
+```
+
+Please note that the chromosome name is arbitrarily set to `chr1`, but it can be freely changed to any other value afterwards. In the next step the resulting `GRanges` object is exported as a GFF3 file. 
+
+```{r granges_export}
+library(rtracklayer)
+export(gr, "test.gff", version = "3")
+```
+
+Please note, that it is necessary to load the `rtracklayer` library before running the `export` command. The contents of the resulting GFF3 file are:
+
+```{r gff_file}
+text <- readLines("test.gff", n = 10)
+cat(strwrap(text, width = 80, exdent = 3), sep = "\n")
+```
+
+Another possibility of utilizing the results of detection is to transform the `PQSViews` object into a `DNAStringSet` object, another commonly used class of the `Biostrings` package. PQS stored inside `DNAStringSet` can be exported into a FASTA file, for example.
+
+## DNAStringSet conversion and export to FASTA
+
+In this example, the output of the `pqsfinder` function will be stored in a `DNAStringSet` object and subsequently exported as a FASTA file. At first, let's do the conversion using the following command:
+
+```{r dnastringset_conversion}
+dss <- as(pqs, "DNAStringSet")
+dss
+```
+
+In the next step, the `DNAStringSet` object is exported as a FASTA file.
+
+```{r dnastringset_export}
+writeXStringSet(dss, file = "test.fa", format = "fasta")
+```
+
+The contents of the resulting FASTA file are:
+
+```{r fasta_file}
+text <- readLines("test.fa", n = 10)
+cat(text, sep = "\n")
+```
+
+Please, note that all attributes of detection such as start position, end position and score value are stored as a `name` parameter (inside the `DNAStringSet`), and thus, they are also shown in the header line of the FASTA format (the line with the initial `>` symbol).
+
+# A real world example
+
+In the following example, we load the human genome from the `r Biocpkg('BSgenome')` package and identify all potential G4 (PQS) in the region of AHNAK gene on chromose 11. We then export the identified positions into a genome annotation track (via a GFF3 file) and an additional FASTA file. Finally, we plot some graphs showing the PQS score distribution and the distribution of PQS along the studied genomic sequence.
+
+1. Load necessary libraries and genomes.
+
+    ```{r rwe_libraries, message=FALSE}
+    library(pqsfinder)
+    library(biomaRt)
+    library(BSgenome.Hsapiens.UCSC.hg38)
+    library(rtracklayer)
+    library(Gviz)
+    ```
+
+2. Retrive AHNAK gene Biomart annotation.
+
+    ```{r rwe_biomart, warning=FALSE}
+    gnm <- "hg38"
+    gene <- "AHNAK"
+    mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+    btrack <- BiomartGeneRegionTrack(biomart = mart, genome = gnm,  symbol = gene,  name = gene)
+    ```
+
+3. Get AHNAK sequence from `r Biocpkg('BSgenome')` package extended by 1000 nucleotides on both sides.
+
+    ```{r rwe_seq}
+    extend <- 1000
+    seq_start <- min(start(btrack)) - extend
+    seq_end <- max(end(btrack)) + extend
+    chr <- chromosome(btrack)
+    seq <- Hsapiens[[chr]][seq_start:seq_end]
+    ```
+
+4. Search for PQS on both strands.
+
+    ```{r rwe_pqsfinder, results='hide'}
+    pqs <- pqsfinder(seq)
+    ```
+
+5. Display the results.
+
+    ```{r rwe_show, message=FALSE}
+    pqs
+    ```
+
+6. Sort the results by score to see the best one.
+
+    ```{r rwe_sort}
+    pqs_s <- pqs[order(score(pqs), decreasing = TRUE)]
+    pqs_s
+    ```
+
+7. Export all PQS into a GFF3-formatted file.
+
+    ```{r rwe_gff}
+    export(as(pqs, "GRanges"), "test.gff", version = "3")
+    ```
+
+    The contents of the GFF3 file are as follows (the first 5 records only):
+
+    ```{r rwe_gff_file, echo=FALSE}
+    text <- readLines("test.gff", n = 7)
+    cat(strwrap(text, width = 80, exdent = 3), sep= "\n")
+    ```
+
+8. Export all PQS into a FASTA format file.
+
+    ```{r rwe_fasta}
+    writeXStringSet(as(pqs, "DNAStringSet"), file = "test.fa", format = "fasta")
+    ```
+
+    The contents of the FASTA file are as follows (the first 5 records only):
+
+    ```{r rwe_fasta_file, echo=FALSE}
+    text <- readLines("test.fa", n = 10)
+    cat(text, sep = "\n")
+    ```
+
+9. Show histogram for score distribution of detected PQS.
+
+    ```{r rwe_hist, fig.height=4, fig.width=6}
+    hist(score(pqs), breaks = 20, main = "Histogram of PQS score")
+    ```
+
+10. Show PQS score and density distribution along AHNAK gene annotation using `r Biocpkg('Gviz')` package.
+
+    ```{r rwe_viz, fig.height=4.0, fig.width=8.0}
+    strack <- DataTrack(
+      start = start(pqs)+seq_start, end = end(pqs)+seq_start,
+      data = score(pqs), chromosome = chr, genome = gnm, name = "score")
+    dtrack <- DataTrack(
+      start = (seq_start):(seq_start+length(density(pqs))-1), width = 1,
+      data = density(pqs), chromosome = chr, genome = gnm,
+      name = "density")
+    atrack <- GenomeAxisTrack()
+    suppressWarnings(plotTracks(c(btrack, strack, dtrack, atrack), type = "h"))
+    ```
+
+# Customizing the detection algorithm
+
+The underlying detection algorithm is almost fully customizable, it can even be set up to find fundamentally different types of G-quadruplexes. The very first option how to change the detection behavior is to tune scoring bonuses, penalizations and factors. Supported options are summarized in the table bellow:
+
+Option name        | Description
+-------------------|--------------------------------------
+`tetrad_bonus`     | Score bonus for each G tetrade, regardless whether the tetrade contains mismatches or not.
+`bulge_penalty`    | Penalization for a run with bulge.
+`mismatch_penalty` | Penalization for a run with mismatch.
+`loop_mean_factor` | Penalization factor of loop length mean.
+`loop_sd_factor`   | Penalization factor of loop length standard deviation.
+
+## Customizing the scoring function
+
+A more complicated way to influence the algorithm output is to implement a custom scoring function and pass it throught the `custom_scoring_fn` options. Before you start experimenting with this feature, please consider the fact that custom scoring function can **influence the overall algorithm performance very negatively**, particularly on long sequences. The best use case of this feature is rapid prototyping of novel scoring techniques, which can be later implemented efficiently, for example in the next version of this package. Thus, if you have any suggestions how to further improve the default scoring system (DSS), please let us know, we would highly appreciate that.
+
+Basically, the custom scoring function should take the following 10 arguments:
+
+* `subject` - input DNAString object,
+* `score` - positive PQS score assigned by DSS, if enabled,
+* `start` - PQS start position,
+* `width` - PQS width,
+* `loop_1` - loop #1 start position,
+* `run_2` - run #2 start position,
+* `loop_2` - loop #2 start position,
+* `run_3` - run #3 start position,
+* `loop_3` - loop #3 start position,
+* `run_4` - run #4 start position.
+
+The function will return a new score as a single integer value. Please note that if `use_default_scoring` is enabled, the custom scoring function is evaluated **after** the DSS but **only if** the DSS resulted in positive score (for performance reasons). On the other hand, when `use_default_scoring` is disabled, custom scoring function is evaluated on every PQS.
+
+**Example:** Imagine you would like to assign a particular type of quadruplex a more favourable score. For example, you might want to reflect that G-quadruplexes with all loops containing just a single cytosine tend to be more stable than similar ones with different nucleotide at the same place. This can be easily implemented by the following custom scoring function: 
+
+```{r custom_scoring_fn}
+c_loop_bonus <- function(subject, score, start, width, loop_1,
+                         run_2, loop_2, run_3, loop_3, run_4) {
+  l1 <- run_2 - loop_1
+  l2 <- run_3 - loop_2
+  l3 <- run_4 - loop_3
+  if (l1 == l2 && l1 == l3 && subject[loop_1] == DNAString("C") &&
+      subject[loop_1] == subject[loop_2] &&
+      subject[loop_1] == subject[loop_3]) {
+    score <- score + 20
+  }
+  return(score)
+}
+```
+
+Without the custom scoring function, the two PQS found in the example sequence will have the same score.
+
+```{r no_custom_scoring, results='hold'}
+seq <- DNAString("GGGCGGGCGGGCGGGAAAAAAAAAAAAAGGGAGGGAGGGAGGG")
+pqsfinder(seq)
+```
+
+However, if the custom scoring function presented above is applied, the two PQS are clearly distinguishable by score:
+
+```{r custom_scoring, results='hold'}
+pqsfinder(seq, custom_scoring_fn = c_loop_bonus)
+```
+
+
+## Complete replacement of the default scoring system
+
+There might be use cases when it is undesirable to have the default scoring system (DSS) enabled. In this example we show how to change the detection algorithm behavior to find quite a different type of sequence motif - an interstrand G-quadruplex (isG4) [@kudlicki_2016]. Unlike standard intramolecular G-quadruplex, isG4 can be defined by interleaving runs of guanines and cytosines respectively. Its canonical form can be described by a regular expression G<sub>n</sub>N<sub>a</sub>C<sub>n</sub>N<sub>b</sub>G<sub>n</sub>N<sub>c</sub>C<sub>n</sub>.
+
+To detect isG4s by the `pqsfinder` function, it is essential to change three options. At first, disable the DSS by setting `use_default_scoring` to `FALSE`. Second, specify a custom regular expression defining one run of the quadruplex by setting `run_re` to `G{3,6}|C{3,6}`. The last step is to define a custom scoring function validating each PQS:
+
+```{r isg4_scoring_function}
+isG4 <- function(subject, score, start, width, loop_1,
+                 run_2, loop_2, run_3, loop_3, run_4) {
+  r1 <- loop_1 - start
+  r2 <- loop_2 - run_2
+  r3 <- loop_3 - run_3
+  r4 <- start + width - run_4
+  
+  if (!(r1 == r2 && r1 == r3 && r1 == r4))
+    return(0)
+  
+  run_1_s <- subject[start:start+r1-1]
+  run_2_s <- subject[run_2:run_2+r2-1]
+  run_3_s <- subject[run_3:run_3+r3-1]
+  run_4_s <- subject[run_4:run_4+r4-1]
+  
+  if (length(grep("^G+$", run_1_s)) && length(grep("^C+$", run_2_s)) &&
+      length(grep("^G+$", run_3_s)) && length(grep("^C+$", run_4_s)))
+    return(r1 * 20)
+  else
+    return(0)
+}
+```
+
+Let's see how it all works together:
+
+```{r isg4_pqsfinder, results='hold'}
+pqsfinder(DNAString("AAAAGGGATCCCTAAGGGGTCCC"), strand = "+",
+          use_default_scoring = FALSE, run_re = "G{3,6}|C{3,6}",
+          custom_scoring_fn = isG4)
+```
+
+# Session info
+
+Here is the output of `sessionInfo()` on the system on which this document was compiled:
+
+```{r sessionInfo, echo=FALSE}
+sessionInfo()
+```
+
+# References
