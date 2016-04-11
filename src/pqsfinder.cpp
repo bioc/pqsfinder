@@ -344,7 +344,7 @@ inline bool find_run(
 void find_all_runs(
     SEXP subject,
     const string &strand,
-    int i,
+    const int i,
     string::const_iterator start,
     string::const_iterator end,
     run_match m[],
