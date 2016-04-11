@@ -1,7 +1,7 @@
 Package: pqsfinder
 Type: Package
 Title: Identification of potential quadruplex forming sequences
-Version: 0.99.2
+Version: 0.99.3
 Authors@R: c(person("Jiri", "Hon", role = c("aut", "cre"), email =
         "jiri.hon@gmail.com"), person("Matej", "Lexa", role = "ctb",
         email = "lexa@fi.muni.cz"), person("Tomas", "Martinek", role =
@@ -22,6 +22,7 @@ Imports: Rcpp (>= 0.12.3), GenomicRanges, IRanges, S4Vectors, methods
 Suggests: BiocStyle, knitr, Gviz, rtracklayer, biomaRt,
         BSgenome.Hsapiens.UCSC.hg38
 LinkingTo: Rcpp, BH, flowCore
+SystemRequirements: GNU make
 VignetteBuilder: knitr
 RoxygenNote: 5.0.1
 NeedsCompilation: yes
