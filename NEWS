@@ -1,3 +1,11 @@
+CHANGES IN VERSION 1.2.1
+------------------------
+
+BUG FIXES
+
+    o Fixed bug responsible for a segmentation fault. Great credit
+      belongs to Diego Andino for sending a bug report.
+
 CHANGES IN VERSION 1.0.0
 ------------------------
 

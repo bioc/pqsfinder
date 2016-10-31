@@ -57,16 +57,20 @@ public:
       const string::const_iterator &s, const string::const_iterator &ref,
       const string &strand, const int *density, const int max_len)
   {
-    int offset;
+    int offset, k_limit;
     if (strand == "+") {
       offset = s - ref;
-      for (int k = 0; k < max_len; ++k)
+      k_limit = min(max_len, this->seq_len - offset);
+      for (int k = 0; k < k_limit; ++k) {
         this->density[offset + k] += density[k];
+      }
     }
     else {
       offset = (this->seq_len - 1) - (s - ref);
-      for (int k = 0; k < max_len; ++k)
+      k_limit = min(max_len, offset + 1);
+      for (int k = 0; k < k_limit; ++k) {
         this->density[offset - k] += density[k];
+      }
     }
   }
   inline void print(const string::const_iterator &ref) const {
