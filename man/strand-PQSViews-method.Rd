@@ -8,10 +8,10 @@
 \S4method{strand}{PQSViews}(x)
 }
 \arguments{
-\item{x}{PQSViews object}
+\item{x}{PQSViews object.}
 }
 \value{
-Strand vector
+Strand vector.
 }
 \description{
 Get PQS strand vector

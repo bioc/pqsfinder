@@ -381,7 +381,8 @@ void find_all_runs(
             Rcout << "Cache hit: " << s - ref  << " " << string(s, s+cache_hit->len)
                   << " " << cache_hit->score << endl;
 
-          res.save_density(s, ref, strand, cache_hit->density, opts.max_len);
+          res.save_density_and_score_dist(
+            s, ref, strand, cache_hit->density, cache_hit->score_dist, opts.max_len);
 
           if (pqs_storage.best.score && s >= pqs_storage.best.e)
           {// Export PQS because no further overlapping pqs can be found
@@ -391,10 +392,13 @@ void find_all_runs(
           continue;
         }
       }
-      // Reset score of best PQS starting at current position and density info
+      // Reset score of best PQS starting at current position
       pqs_cache.score = 0;
-      for (int k = 0; k < opts.max_len; ++k)
+      // Reset density and score distribution
+      for (int k = 0; k < opts.max_len; ++k) {
         pqs_cache.density[k] = 0;
+        pqs_cache.score_dist[k] = 0;
+      }
     }
     min_e = s + opts.run_min_len;
 
@@ -450,7 +454,10 @@ void find_all_runs(
         if ((score || !flags.use_default_scoring) && sc.custom_scoring_fn != NULL) {
           check_custom_scoring_fn(score, m, sc, subject, ref);
         }
-
+        if (score) {
+          for (int k = 0; k < e - pqs_start; ++k)
+            pqs_cache.score_dist[k] = max(pqs_cache.score_dist[k], score);
+        }
         if (score && score >= opts.min_score) {
           // Current PQS satisfied all constraints.
           pqs_storage.insert(score, pqs_start, e);
@@ -474,7 +481,8 @@ void find_all_runs(
         ctable.put(s, min(s + opts.max_len, end), pqs_cache);
 
       // Add locally accumulated density to global density array
-      res.save_density(s, ref, strand, pqs_cache.density, opts.max_len);
+      res.save_density_and_score_dist(
+        s, ref, strand, pqs_cache.density, pqs_cache.score_dist, opts.max_len);
     }
   }
 }
@@ -718,9 +726,13 @@ SEXP pqsfinder(
   CharacterVector res_strand(res.strand.begin(), res.strand.end());
 
   NumericVector res_density(seq.length());
-  for (unsigned i = 0; i < seq.length(); ++i)
+  IntegerVector res_score_dist(seq.length());
+  for (unsigned i = 0; i < seq.length(); ++i) {
     res_density[i] = res.density[i];
-
+    res_score_dist[i] = res.score_dist[i];
+  }
   Function pqsviews("PQSViews");
-  return pqsviews(subject, res_start, res_width, res_strand, res_score, res_density);
+  return pqsviews(
+    subject, res_start, res_width, res_strand, res_score,
+    res_density, res_score_dist);
 }

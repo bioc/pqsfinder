@@ -4,7 +4,7 @@
 \name{PQSViews-class}
 \alias{.PQSViews}
 \alias{PQSViews-class}
-\title{An S4 class to represent potential quadruplex forming sequences.}
+\title{An S4 class to represent potential quadruplex forming sequences}
 \description{
 Represents potential quadruplex forming sequences found by
 \code{\link{pqsfinder}} function. This is a subclass of
@@ -15,5 +15,7 @@ Represents potential quadruplex forming sequences found by
 \describe{
 \item{\code{density}}{Numbers of PQS (potential quadruplex forming sequences)
 overlapping at each position in input sequence.}
+
+\item{\code{score_distribution}}{Score of the best PQS found at each position.}
 }}
 

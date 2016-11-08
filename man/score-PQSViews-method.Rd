@@ -8,10 +8,10 @@
 \S4method{score}{PQSViews}(x)
 }
 \arguments{
-\item{x}{PQSViews object}
+\item{x}{PQSViews object.}
 }
 \value{
-Score vector
+Score vector.
 }
 \description{
 Get PQS score vector

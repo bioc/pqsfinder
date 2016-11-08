@@ -7,7 +7,7 @@
 ##
 
 
-#' An S4 class to represent potential quadruplex forming sequences.
+#' An S4 class to represent potential quadruplex forming sequences
 #'
 #' Represents potential quadruplex forming sequences found by
 #' \code{\link{pqsfinder}} function. This is a subclass of
@@ -15,23 +15,28 @@
 #'
 #' @slot density Numbers of PQS (potential quadruplex forming sequences)
 #'               overlapping at each position in input sequence.
+#' @slot score_distribution Score of the best PQS found at each position.
 #'
 .PQSViews <- setClass(
   "PQSViews",
   contains = "XStringViews",
   slots = c(
-    density = "numeric"
+    density = "numeric",
+    score_distribution = "integer"
   ),
   validity = function(object) {
     if (length(object@subject) != length(object@density)) {
-      return("Length of density vector is not equal to length of subject.")
+      return("Length of the density vector is not equal to the length of the subject.")
+    }
+    if (length(object@subject) != length(object@score_distribution)) {
+      return("Length of the score distribution vector is not equal to the length of the subject.")
     }
     return(TRUE)
   }
 )
 
 
-#' PQSViews class constructor.
+#' PQSViews class constructor
 #'
 #' User friendly constructor for PQSViews class representing potential
 #' quadruplex forming sequences (PQS). PQSViews is a subclass of
@@ -44,31 +49,33 @@
 #' @param strand Vector of PQS strand specifications.
 #' @param score Vector of PQS scores.
 #' @param density Numbers of PQS overlapping at each position in \code{subject}.
-#' @return PQSViews object
+#' @param score_distribution Score of the best PQS found at each position.
+#' @return PQSViews object.
 #'
 #' @examples
-#' pv <- PQSViews(DNAString("CGGGCGGGGC"), 1:2, 2:3, "+", 10:11, 1:10)
+#' pv <- PQSViews(DNAString("CGGGCGGGGC"), 1:2, 2:3, "+", 10:11, 1:10, 1:10)
 #' start(pv)
 #' width(pv)
 #' strand(pv)
 #' score(pv)
 #' density(pv)
+#' scoreDistribution(pv)
 #'
 PQSViews <- function(
-  subject, start, width, strand, score, density)
+  subject, start, width, strand, score, density, score_distribution)
 {
   ix <- order(start)
 
   .PQSViews(subject = subject, ranges = IRanges(start = start[ix], width = width[ix]),
             elementMetadata = DataFrame(strand = strand[ix], score = score[ix]),
-            density = density)
+            density = density, score_distribution = score_distribution)
 }
 
 
 #' Get PQS score vector
 #'
-#' @param x PQSViews object
-#' @return Score vector
+#' @param x PQSViews object.
+#' @return Score vector.
 #' @examples
 #' pqs <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGGAAAA"))
 #' score(pqs)
@@ -77,8 +84,8 @@ setMethod("score", "PQSViews", function(x) mcols(x)$score)
 
 #' Get PQS strand vector
 #'
-#' @param x PQSViews object
-#' @return Strand vector
+#' @param x PQSViews object.
+#' @return Strand vector.
 #' @examples
 #' pqs <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGGAAAA"))
 #' strand(pqs)
@@ -90,14 +97,40 @@ setMethod("strand", "PQSViews", function(x) mcols(x)$strand)
 #' Desity vector represents numbers of PQS (potential quadruplex forming
 #' sequences) overlapping at each position in input sequence.
 #'
-#' @param x PQSViews object
-#' @return Density vector
+#' @param x PQSViews object.
+#' @return Density vector.
 #' @examples
 #' pqs <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGGAAAA"))
 #' density(pqs)
 #'
 setMethod("density", "PQSViews", function(x) x@density)
 
+#' Get score distribution vector
+#' 
+#' Get score distribution vector of given object.
+#' 
+#' @param x An object.
+#' @param ... Additional arguments, for use in specific methods.
+#' @return Score distribution vector.
+#' @examples
+#' showMethods("scoreDistribution")
+#' 
+setGeneric("scoreDistribution", function(x, ...) {
+  standardGeneric("scoreDistribution")
+})
+
+#' Get score distribution vector
+#'
+#' Score distribution vector represents score of the best PQS found
+#' at each sequence position.
+#' 
+#' @param x PQSViews object.
+#' @return Score distribution vector.
+#' @examples
+#' pqs <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGGAAAA"))
+#' scoreDistribution(pqs)
+#'
+setMethod('scoreDistribution', 'PQSViews', function(x) x@score_distribution)
 
 ## The 2 helper functions below convert a given view on an XString object
 ## into a character-string.

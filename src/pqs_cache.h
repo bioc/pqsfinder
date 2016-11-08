@@ -19,25 +19,34 @@ using namespace std;
 class pqs_cache {
 public:
   class entry {
+  private:
+    void init(const int max_len) {
+      this->density = (int *)calloc(this->max_len, sizeof(int));
+      if (this->density == NULL)
+        stop("Unable to allocate memory for cache density vector.");
+      this->score_dist = (int *)calloc(this->max_len, sizeof(int));
+      if (this->score_dist == NULL)
+        stop("Unable to allocate memory for cache score distribution vector.");
+    }
   public:
     int *density;
+    int *score_dist;
     int score;
     int len;
     const int max_len;
     entry(const int max_len) : score(0), len(0), max_len(max_len) {
-      this->density = (int *)calloc(this->max_len, sizeof(int));
-      if (this->density == NULL)
-        stop("Unable to allocate memory for cache density vector.");
+      init(max_len);
     }
     entry(const entry &obj) : score(obj.score), len(obj.len), max_len(obj.max_len) {
-      this->density = (int *)malloc(this->max_len * sizeof(int));
-      if (this->density == NULL)
-        stop("Unable to allocate memory for cache density vector.");
+      init(obj.max_len);
       memcpy(this->density, obj.density, this->max_len);
+      memcpy(this->score_dist, obj.score_dist, this->max_len);
     }
     ~entry() {
       if (this->density != NULL)
         free(this->density);
+      if (this->score_dist != NULL)
+        free(this->score_dist);
     }
   };
   typedef map<string, pqs_cache::entry> cache_map;

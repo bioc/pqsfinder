@@ -22,6 +22,7 @@ public:
   vector<int> score;
   vector<string> strand;
   int *density;
+  int *score_dist;
 
   const int min_score;
   const int seq_len;
@@ -32,10 +33,15 @@ public:
     this->density = (int *)calloc(seq_len, sizeof(int));
     if (this->density == NULL)
       stop("Unable to allocate memory for results density vector.");
+    this->score_dist = (int *)calloc(seq_len, sizeof(int));
+    if (this->score_dist == NULL)
+      stop("Unable to allocate memory for results score distribution vector.");
   }
   ~results() {
     if (this->density != NULL)
       free(this->density);
+    if (this->score_dist != NULL)
+      free(this->score_dist);
   }
   inline void save_pqs(
       const int score, const string::const_iterator &s,
@@ -53,23 +59,27 @@ public:
       this->strand.push_back(strand);
     }
   }
-  inline void save_density(
+  inline void save_density_and_score_dist(
       const string::const_iterator &s, const string::const_iterator &ref,
-      const string &strand, const int *density, const int max_len)
+      const string &strand, const int *density, const int *score_dist, const int max_len)
   {
     int offset, k_limit;
     if (strand == "+") {
       offset = s - ref;
       k_limit = min(max_len, this->seq_len - offset);
       for (int k = 0; k < k_limit; ++k) {
-        this->density[offset + k] += density[k];
+        int i = offset + k;
+        this->density[i] += density[k];
+        this->score_dist[i] = max(this->score_dist[i], score_dist[k]);
       }
     }
     else {
       offset = (this->seq_len - 1) - (s - ref);
       k_limit = min(max_len, offset + 1);
       for (int k = 0; k < k_limit; ++k) {
-        this->density[offset - k] += density[k];
+        int i = offset - k;
+        this->density[i] += density[k];
+        this->score_dist[i] = max(this->score_dist[i], score_dist[k]);
       }
     }
   }

@@ -8,10 +8,10 @@
 \S4method{density}{PQSViews}(x)
 }
 \arguments{
-\item{x}{PQSViews object}
+\item{x}{PQSViews object.}
 }
 \value{
-Density vector
+Density vector.
 }
 \description{
 Desity vector represents numbers of PQS (potential quadruplex forming

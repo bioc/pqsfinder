@@ -2,9 +2,9 @@
 % Please edit documentation in R/PQSViews-class.R
 \name{PQSViews}
 \alias{PQSViews}
-\title{PQSViews class constructor.}
+\title{PQSViews class constructor}
 \usage{
-PQSViews(subject, start, width, strand, score, density)
+PQSViews(subject, start, width, strand, score, density, score_distribution)
 }
 \arguments{
 \item{subject}{DNAString object.}
@@ -18,9 +18,11 @@ PQSViews(subject, start, width, strand, score, density)
 \item{score}{Vector of PQS scores.}
 
 \item{density}{Numbers of PQS overlapping at each position in \code{subject}.}
+
+\item{score_distribution}{Score of the best PQS found at each position.}
 }
 \value{
-PQSViews object
+PQSViews object.
 }
 \description{
 User friendly constructor for PQSViews class representing potential
@@ -29,12 +31,13 @@ quadruplex forming sequences (PQS). PQSViews is a subclass of
 PQS density.
 }
 \examples{
-pv <- PQSViews(DNAString("CGGGCGGGGC"), 1:2, 2:3, "+", 10:11, 1:10)
+pv <- PQSViews(DNAString("CGGGCGGGGC"), 1:2, 2:3, "+", 10:11, 1:10, 1:10)
 start(pv)
 width(pv)
 strand(pv)
 score(pv)
 density(pv)
+scoreDistribution(pv)
 
 }
 
