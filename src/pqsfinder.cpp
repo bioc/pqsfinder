@@ -303,16 +303,16 @@ inline bool find_run(
 
   string::const_iterator s = start, e;
 
-  if (flags.use_re) {
-    try {
-      status = boost::regex_search(start, end, boost_m, run_re_c, boost::match_default);
-    } catch (bad_alloc &ba) {
-      stop(string("Regexp engine failed with exception: ") + ba.what());
-    }
-    if (status) {
-      m.first = boost_m[0].first;
-      m.second = boost_m[0].second;
-    }
+  if (false) { //flags.use_re) {
+    // try {
+    //   status = boost::regex_search(start, end, boost_m, run_re_c, boost::match_default);
+    // } catch (bad_alloc &ba) {
+    //   stop(string("Regexp engine failed with exception: ") + ba.what());
+    // }
+    // if (status) {
+    //   m.first = boost_m[0].first;
+    //   m.second = boost_m[0].second;
+    // }
   } else {
     while (*s != 'G' && s < end) ++s;
     e = min(s + opts.run_max_len, end);
