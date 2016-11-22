@@ -24,7 +24,7 @@ using namespace std;
 
 
 /*
- * Important notes to C++ iterator semantics that are extensively used in this code:
+ * Extract from C++ reference documentation to string iterator semantics:
  *
  * string::end method returns an iterator pointing to the __past-the-end__ character
  * of the string! The past-the-end character is a theoretical character that would
@@ -45,8 +45,9 @@ public:
   int tetrad_bonus;
   int bulge_penalty;
   int mismatch_penalty;
-  int loop_mean_factor;
-  int loop_sd_factor;
+  double loop_mean_factor;
+  double loop_mean_exponent;
+  double loop_sd_factor;
   int max_bulges;
   int max_mimatches;
   int max_defects;
@@ -233,7 +234,10 @@ inline void score_loop_lengths(int &score, const run_match m[], const scoring &s
 
   int sd = sqrt((d1 + d2 + d3)/2.0);
 
-  score = max(score - sc.loop_mean_factor * mean - sc.loop_sd_factor * sd, 0);
+  score = max(
+    score - (int) (sc.loop_mean_factor * pow(mean, sc.loop_mean_exponent))
+          - (int) (sc.loop_sd_factor * sd),
+    0);
 }
 
 
@@ -438,7 +442,7 @@ void find_all_runs(
           pqs_cnt = 0;
           checkUserInterrupt();
           if (!flags.verbose)
-            Rcout << "Search status: " << ceilf((m[0].first - ref)/(float)len*100) << " %\r" << flush;
+            Rcout << "Search status: " << ceilf((m[0].first - ref)/(double)len*100) << " %\r" << flush;
         }
 
         if (pqs_storage.best.score && pqs_start >= pqs_storage.best.e)
@@ -551,8 +555,9 @@ void pqs_search(
 //' @param tetrad_bonus Score bonus for one complete G tetrade.
 //' @param bulge_penalty Penalization for a bulge in quadruplex run.
 //' @param mismatch_penalty Penalization for a mismatch in tetrad.
-//' @param loop_mean_factor Penalization factor of loop lengths mean.
-//' @param loop_sd_factor Penalization factor of loop lengths standard
+//' @param loop_mean_factor Penalization factor of loop length mean.
+//' @param loop_mean_exponent Exponent of loop length mean.
+//' @param loop_sd_factor Penalization factor of loop length standard
 //'   deviation.
 //' @param run_re Regular expression specifying one run of quadruplex.
 //' @param custom_scoring_fn Custom quadruplex scoring function. It takes the
@@ -602,8 +607,9 @@ SEXP pqsfinder(
     int tetrad_bonus = 45,
     int bulge_penalty = 20,
     int mismatch_penalty = 31,
-    float loop_mean_factor = 1,
-    float loop_sd_factor = 1,
+    double loop_mean_factor = 1,
+    double loop_mean_exponent = 1,
+    double loop_sd_factor = 1,
     std::string run_re = "G{1,5}.{0,5}G{1,5}",
     SEXP custom_scoring_fn = R_NilValue,
     bool use_default_scoring = true,
@@ -670,6 +676,7 @@ SEXP pqsfinder(
   sc.bulge_penalty = bulge_penalty;
   sc.mismatch_penalty = mismatch_penalty;
   sc.loop_mean_factor = loop_mean_factor;
+  sc.loop_mean_exponent = loop_mean_exponent;
   sc.loop_sd_factor = loop_sd_factor;
   sc.max_bulges = max_bulges;
   sc.max_mimatches = max_mismatches;

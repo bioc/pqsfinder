@@ -23,8 +23,9 @@
 #' @param tetrad_bonus Score bonus for one complete G tetrade.
 #' @param bulge_penalty Penalization for a bulge in quadruplex run.
 #' @param mismatch_penalty Penalization for a mismatch in tetrad.
-#' @param loop_mean_factor Penalization factor of loop lengths mean.
-#' @param loop_sd_factor Penalization factor of loop lengths standard
+#' @param loop_mean_factor Penalization factor of loop length mean.
+#' @param loop_mean_exponent Exponent of loop length mean.
+#' @param loop_sd_factor Penalization factor of loop length standard
 #'   deviation.
 #' @param run_re Regular expression specifying one run of quadruplex.
 #' @param custom_scoring_fn Custom quadruplex scoring function. It takes the
@@ -58,7 +59,7 @@
 #' @examples
 #' pv <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGGAAAA"))
 #'
-pqsfinder <- function(subject, strand = "*", max_len = 50L, min_score = 42L, run_min_len = 3L, run_max_len = 11L, loop_min_len = 0L, loop_max_len = 30L, max_bulges = 3L, max_mismatches = 2L, max_defects = 3L, tetrad_bonus = 45L, bulge_penalty = 20L, mismatch_penalty = 31L, loop_mean_factor = 1, loop_sd_factor = 1, run_re = "G{1,5}.{0,5}G{1,5}", custom_scoring_fn = NULL, use_default_scoring = TRUE, verbose = FALSE) {
-    .Call('pqsfinder_pqsfinder', PACKAGE = 'pqsfinder', subject, strand, max_len, min_score, run_min_len, run_max_len, loop_min_len, loop_max_len, max_bulges, max_mismatches, max_defects, tetrad_bonus, bulge_penalty, mismatch_penalty, loop_mean_factor, loop_sd_factor, run_re, custom_scoring_fn, use_default_scoring, verbose)
+pqsfinder <- function(subject, strand = "*", max_len = 50L, min_score = 42L, run_min_len = 3L, run_max_len = 11L, loop_min_len = 0L, loop_max_len = 30L, max_bulges = 3L, max_mismatches = 2L, max_defects = 3L, tetrad_bonus = 45L, bulge_penalty = 20L, mismatch_penalty = 31L, loop_mean_factor = 1, loop_mean_exponent = 1, loop_sd_factor = 1, run_re = "G{1,5}.{0,5}G{1,5}", custom_scoring_fn = NULL, use_default_scoring = TRUE, verbose = FALSE) {
+    .Call('pqsfinder_pqsfinder', PACKAGE = 'pqsfinder', subject, strand, max_len, min_score, run_min_len, run_max_len, loop_min_len, loop_max_len, max_bulges, max_mismatches, max_defects, tetrad_bonus, bulge_penalty, mismatch_penalty, loop_mean_factor, loop_mean_exponent, loop_sd_factor, run_re, custom_scoring_fn, use_default_scoring, verbose)
 }
 
