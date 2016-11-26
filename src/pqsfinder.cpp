@@ -75,6 +75,7 @@ typedef struct flags {
 } flags_t;
 
 typedef struct opts {
+  bool overlapping;
   int max_len;
   int min_score;
   int run_min_len;
@@ -144,6 +145,38 @@ void count_g(std::string seq) {
 }
 
 
+inline int score_run_defects(const int pi, const int w[], const int g[], int l[], const scoring &sc, const opts_t &opts) {
+  int mismatches = 0, bulges = 0, perfects = 0;
+  for (int i = 0; i < RUN_CNT; ++i) {
+    if (w[i] == w[pi] && g[i] == g[pi])
+      ++perfects;
+    else if ((w[i] == w[pi] && g[i] == g[pi] - 1))
+      ++mismatches;
+    else if (w[i] == w[pi] - 1 && g[i] == g[pi] - 1) {
+      if (i == 1 || i == 2) {
+        // check if loops are able to absorb the mismatches
+        if (l[i-1] > opts.loop_min_len) {
+          --l[i-1];
+        } else if (l[i] > opts.loop_min_len) {
+          --l[i];
+        } else {
+          return 0;
+        }
+      }
+      ++mismatches;
+    }
+    else if (w[i] > w[pi] && g[i] >= g[pi])
+      ++bulges;
+    else {
+      return 0;
+    }
+  }
+  if (mismatches <= sc.max_mimatches && bulges <= sc.max_bulges && mismatches + bulges <= sc.max_defects)
+    return (w[pi] - 1) * sc.tetrad_bonus - mismatches * sc.mismatch_penalty - bulges * sc.bulge_penalty;
+  else
+    return 0;
+}
+
 /**
  * Check content of runs
  *
@@ -151,35 +184,79 @@ void count_g(std::string seq) {
  * @param m Quadruples runs
  * @param sc Scoring table
  */
-inline void score_run_content(int &score, const run_match m[], const scoring &sc)
+inline void score_run_content(int &score, const run_match m[], const scoring &sc, const opts_t &opts)
 {
-  int w[RUN_CNT], g[RUN_CNT];
-  int pi = -1, mismatches = 0, bulges = 0, perfects = 0;
+  int w[RUN_CNT], g[RUN_CNT], l[RUN_CNT - 1], l_tmp[RUN_CNT -1];
+  int max_score = 0, tmp_score = 0;
 
   w[0] = m[0].length();
   w[1] = m[1].length();
   w[2] = m[2].length();
   w[3] = m[3].length();
-
+  
+  g[0] = count_g_num(m[0]);
+  g[1] = count_g_num(m[1]);
+  g[2] = count_g_num(m[2]);
+  g[3] = count_g_num(m[3]);
+  
+  l[0] = m[1].first - m[0].second;
+  l[1] = m[2].first - m[1].second;
+  l[2] = m[3].first - m[2].second;
+  
+  bool has_one_perfect = false;
+  
+  for (int i = 0; i < RUN_CNT; ++i) {
+    if (g[i] == w[i]) {
+      // perfect run, use as a possible reference.
+      has_one_perfect = true;
+      l_tmp[0] = l[0];
+      l_tmp[1] = l[1];
+      l_tmp[2] = l[2];
+      
+      tmp_score = score_run_defects(i, g, w, l, sc, opts);
+      if (tmp_score > max_score) {
+        max_score = tmp_score;
+        l[0] = l_tmp[0];
+        l[1] = l_tmp[1];
+        l[2] = l_tmp[2];
+      }
+    }
+  }
+  if (has_one_perfect) {
+    score = max_score;
+  } else {
+    score = 0;
+  }
+}
+inline void score_run_content_old(int &score, const run_match m[], const scoring &sc)
+{
+  int w[RUN_CNT], g[RUN_CNT];
+  int pi = -1, mismatches = 0, bulges = 0, perfects = 0;
+  
+  w[0] = m[0].length();
+  w[1] = m[1].length();
+  w[2] = m[2].length();
+  w[3] = m[3].length();
+  
   /*
-   * Allowed length combinations:
-   * r r r r
-   * R r r r
-   * r R r r
-   * r r R r
-   * r r r R
-   */
+  * Allowed length combinations:
+  * r r r r
+  * R r r r
+  * r R r r
+  * r r R r
+  * r r r R
+  */
   if (sc.max_bulges == 1 && !(
-       (w[0] == w[1] && w[0] == w[2] && w[0] == w[3]) ||
-       (w[0] >  w[1] && w[1] == w[2] && w[1] == w[3]) ||
-       (w[0] <  w[1] && w[0] == w[2] && w[0] == w[3]) ||
-       (w[0] == w[1] && w[1] <  w[2] && w[0] == w[3]) ||
-       (w[0] == w[1] && w[0] == w[2] && w[0] <  w[3])
-      )) {
+    (w[0] == w[1] && w[0] == w[2] && w[0] == w[3]) ||
+      (w[0] >  w[1] && w[1] == w[2] && w[1] == w[3]) ||
+      (w[0] <  w[1] && w[0] == w[2] && w[0] == w[3]) ||
+      (w[0] == w[1] && w[1] <  w[2] && w[0] == w[3]) ||
+      (w[0] == w[1] && w[0] == w[2] && w[0] <  w[3])
+  )) {
     score = 0;
     return;
   }
-
+  
   for (int i = 0; i < RUN_CNT; ++i) {
     g[i] = count_g_num(m[i]);
     if (g[i] == w[i] && (pi == -1 || w[i] < w[pi]))
@@ -207,7 +284,6 @@ inline void score_run_content(int &score, const run_match m[], const scoring &sc
   else
     score = 0;
 }
-
 
 /**
  * Check loop lengths
@@ -445,14 +521,14 @@ void find_all_runs(
             Rcout << "Search status: " << ceilf((m[0].first - ref)/(double)len*100) << " %\r" << flush;
         }
 
-        if (pqs_storage.best.score && pqs_start >= pqs_storage.best.e)
+        if (!opts.overlapping && pqs_storage.best.score && pqs_start >= pqs_storage.best.e)
         {// Export PQS because no further overlapping pqs can be found
           pqs_storage.export_pqs(res, ref, strand);
         }
 
         score = 0;
         if (flags.use_default_scoring) {
-          score_run_content(score, m, sc);
+          score_run_content(score, m, sc, opts);
           score_loop_lengths(score, m, sc);
         }
         if ((score || !flags.use_default_scoring) && sc.custom_scoring_fn != NULL) {
@@ -464,8 +540,11 @@ void find_all_runs(
         }
         if (score && score >= opts.min_score) {
           // Current PQS satisfied all constraints.
-          pqs_storage.insert(score, pqs_start, e);
-
+          if (!opts.overlapping) {
+            pqs_storage.insert(score, pqs_start, e);
+          } else {
+            res.save_pqs(score, pqs_start, e, ref, strand);
+          }
           for (int k = 0; k < e - pqs_start; ++k)
             ++pqs_cache.density[k];
 
@@ -528,7 +607,7 @@ void pqs_search(
     seq.begin(), seq.length(), pqs_start, pqs_storage, ctable,
     pqs_cache, pqs_cnt, res
   );
-  if (pqs_storage.best.score)
+  if (!opts.overlapping && pqs_storage.best.score)
     pqs_storage.export_pqs(res, seq.begin(), strand);
 }
 
@@ -542,6 +621,7 @@ void pqs_search(
 //' @param strand Strand specification. Allowed values are "+", "-" or "*",
 //'   where the last one represents both strands. Implicitly, the input
 //'   DNAString object is assumed to encode the "+" strand.
+//' @param overlapping If true, than all overlapping PQS will be reported.
 //' @param max_len Maximal lenth of PQS.
 //' @param min_score Minimal PQS score.
 //' @param run_min_len Minimal length of quadruplex run.
@@ -595,6 +675,7 @@ void pqs_search(
 SEXP pqsfinder(
     SEXP subject,
     std::string strand = "*",
+    bool overlapping = false,
     int max_len = 50,
     int min_score = 42,
     int run_min_len = 3,
@@ -652,7 +733,7 @@ SEXP pqsfinder(
     stop("Subject must be DNAString object.");
 
   flags_t flags;
-  flags.use_cache = true;
+  flags.use_cache = overlapping ? false : true;
   flags.use_re = false;
   flags.use_prof = false;
   flags.debug = false;
@@ -664,6 +745,7 @@ SEXP pqsfinder(
     flags.use_re = true;
 
   opts_t opts;
+  opts.overlapping = overlapping;
   opts.max_len = max_len;
   opts.min_score = min_score;
   opts.loop_max_len = loop_max_len;
