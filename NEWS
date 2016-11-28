@@ -1,27 +1,29 @@
-CHANGES IN VERSION 1.3.3
+CHANGES IN VERSION 1.3.x
 ------------------------
 
 NEW FEATURES:
 
-    o Score distribution is now reported. For each sequence position
+    o New algorithm option: reporting of all overlapping PQS can be
+      enabled.
+    o Score distribution is reported. For each sequence position
       you get maximal score of PQS that was found overlapping
       the position. For details, see scoreDistribution function.
-    o Novel scoring parameter was introduced. Now it is possible
-      to specify exponent of loop length mean in the scoring equation
-      to express non-linear dependency of the PQS propensity to the
-      loop lengths.
+    o Novel scoring parameter: exponent of loop length mean
+      in the scoring equation can be specified to express non-linear
+      dependency of the PQS propensity to the loop lengths.
 
 BUG FIXES
 
     o Fixed unintentional cast of loop length mean factor and loop
       standard deviation factors from float to integer.
-      
 
-CHANGES IN VERSION 1.2.1
+CHANGES IN VERSION 1.2.x
 ------------------------
 
 BUG FIXES
 
+    o Min loop length is now set to 1 by default.
+    o Removed linking dependency on the flowCore package.
     o Fixed bug responsible for a segmentation fault. Great credit
       belongs to Diego Andino for sending a bug report.
 
