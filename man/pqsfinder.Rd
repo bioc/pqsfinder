@@ -6,7 +6,7 @@
 \usage{
 pqsfinder(subject, strand = "*", overlapping = FALSE, max_len = 50L,
   min_score = 42L, run_min_len = 3L, run_max_len = 11L,
-  loop_min_len = 0L, loop_max_len = 30L, max_bulges = 3L,
+  loop_min_len = 1L, loop_max_len = 30L, max_bulges = 3L,
   max_mismatches = 2L, max_defects = 3L, tetrad_bonus = 45L,
   bulge_penalty = 20L, mismatch_penalty = 31L, loop_mean_factor = 1,
   loop_mean_exponent = 1, loop_sd_factor = 1,

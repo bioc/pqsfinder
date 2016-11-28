@@ -178,16 +178,17 @@ inline int score_run_defects(const int pi, const int w[], const int g[], int l[]
 }
 
 /**
- * Check content of runs
+ * Score PQS.
  *
- * @param score Quadruplex score
- * @param m Quadruples runs
- * @param sc Scoring table
+ * @param m Quadruples runs.
+ * @param sc Scoring table.
+ * @param opts Algorithm options.
+ * @return Quadruplex score.
  */
-inline void score_run_content(int &score, const run_match m[], const scoring &sc, const opts_t &opts)
+inline int score_pqs(const run_match m[], const scoring &sc, const opts_t &opts)
 {
-  int w[RUN_CNT], g[RUN_CNT], l[RUN_CNT - 1], l_tmp[RUN_CNT -1];
-  int max_score = 0, tmp_score = 0;
+  int w[RUN_CNT], g[RUN_CNT], l[RUN_CNT - 1], l_tmp[RUN_CNT - 1];
+  int score = 0, tmp_score = 0;
 
   w[0] = m[0].length();
   w[1] = m[1].length();
@@ -212,23 +213,39 @@ inline void score_run_content(int &score, const run_match m[], const scoring &sc
       l_tmp[0] = l[0];
       l_tmp[1] = l[1];
       l_tmp[2] = l[2];
+      tmp_score = score_run_defects(i, g, w, l_tmp, sc, opts);
       
-      tmp_score = score_run_defects(i, g, w, l, sc, opts);
-      if (tmp_score > max_score) {
-        max_score = tmp_score;
+      if (tmp_score > score) {
+        score = tmp_score;
         l[0] = l_tmp[0];
         l[1] = l_tmp[1];
         l[2] = l_tmp[2];
       }
     }
   }
-  if (has_one_perfect) {
-    score = max_score;
-  } else {
-    score = 0;
+  if (!has_one_perfect || score == 0) {
+    return 0;
   }
+  int mean = (l[0] + l[1] + l[2])/3;
+  int d1 = (l[0] - mean)*(l[0] - mean);
+  int d2 = (l[1] - mean)*(l[1] - mean);
+  int d3 = (l[2] - mean)*(l[2] - mean);
+  int sd = sqrt((d1 + d2 + d3)/2.0);
+  
+  return max(
+    score - (int) (sc.loop_mean_factor * pow(mean, sc.loop_mean_exponent))
+    - (int) (sc.loop_sd_factor * sd),
+    0);
 }
-inline void score_run_content_old(int &score, const run_match m[], const scoring &sc)
+
+/**
+ * Score run content.
+ *
+ * @param score Quadruplex score.
+ * @param m Quadruples runs.
+ * @param sc Scoring table.
+ */
+inline void score_run_content(int &score, const run_match m[], const scoring &sc)
 {
   int w[RUN_CNT], g[RUN_CNT];
   int pi = -1, mismatches = 0, bulges = 0, perfects = 0;
@@ -528,8 +545,9 @@ void find_all_runs(
 
         score = 0;
         if (flags.use_default_scoring) {
-          score_run_content(score, m, sc, opts);
-          score_loop_lengths(score, m, sc);
+          score = score_pqs(m, sc, opts);
+          //score_run_content(score, m, sc, opts);
+          //score_loop_lengths(score, m, sc);
         }
         if ((score || !flags.use_default_scoring) && sc.custom_scoring_fn != NULL) {
           check_custom_scoring_fn(score, m, sc, subject, ref);
@@ -680,7 +698,7 @@ SEXP pqsfinder(
     int min_score = 42,
     int run_min_len = 3,
     int run_max_len = 11,
-    int loop_min_len = 0,
+    int loop_min_len = 1,
     int loop_max_len = 30,
     int max_bulges = 3,
     int max_mismatches = 2,
@@ -697,9 +715,11 @@ SEXP pqsfinder(
     bool verbose = false)
 {
   if (max_len < 1)
-    stop("Maximal length of PQS has to be positive value.");
-  if (min_score < 1)
-    stop("Minimal PQS score has to be positive value.");
+    stop("Maximal length of PQS has to be a positive value.");
+  if (min_score < 1) {
+    Rprintf("hello world\n");
+    stop("Minimal PQS score has to be a positive value.");
+  }
 
   if (run_min_len < 0)
     stop("Minimal PQS run length has to be non-negative value.");
