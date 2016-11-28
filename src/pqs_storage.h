@@ -1,5 +1,5 @@
 /**
- * Storage class aggregating best overlapping PQS.
+ * Storage class aggregating locally-best PQS.
  *
  * Author: Jiri Hon <jiri.hon@gmail.com>
  * Date: 2016/03/30
