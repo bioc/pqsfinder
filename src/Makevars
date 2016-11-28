@@ -6,4 +6,4 @@ ifneq (,)
 This makefile requires GNU Make.
 endif
 
-#PKG_LIBS = `${R_HOME}/bin/Rscript -e "flowCore:::LdFlags()"`
+PKG_LIBS = `${R_HOME}/bin/Rscript -e "flowCore:::LdFlags()"`
