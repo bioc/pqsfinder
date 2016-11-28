@@ -3,14 +3,13 @@ CHANGES IN VERSION 1.3.x
 
 NEW FEATURES:
 
-    o New algorithm option: reporting of all overlapping PQS can be
-      enabled.
+    o New algorithm option: reporting of all overlapping PQS.
     o Score distribution is reported. For each sequence position
       you get maximal score of PQS that was found overlapping
       the position. For details, see scoreDistribution function.
     o Novel scoring parameter: exponent of loop length mean
-      in the scoring equation can be specified to express non-linear
-      dependency of the PQS propensity to the loop lengths.
+      in the scoring equation to express non-linear dependency
+      of the PQS propensity to the loop lengths.
 
 BUG FIXES
 
