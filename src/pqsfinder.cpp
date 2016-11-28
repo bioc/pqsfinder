@@ -469,16 +469,16 @@ inline bool find_run(
 
   string::const_iterator s = start, e;
 
-  if (false) { //flags.use_re) {
-    // try {
-    //   status = boost::regex_search(start, end, boost_m, run_re_c, boost::match_default);
-    // } catch (bad_alloc &ba) {
-    //   stop(string("Regexp engine failed with exception: ") + ba.what());
-    // }
-    // if (status) {
-    //   m.first = boost_m[0].first;
-    //   m.second = boost_m[0].second;
-    // }
+  if (flags.use_re) {
+    try {
+      status = boost::regex_search(start, end, boost_m, run_re_c, boost::match_default);
+    } catch (bad_alloc &ba) {
+      stop(string("Regexp engine failed with exception: ") + ba.what());
+    }
+    if (status) {
+      m.first = boost_m[0].first;
+      m.second = boost_m[0].second;
+    }
   } else {
     while (*s != 'G' && s < end) ++s;
     e = min(s + opts.run_max_len, end);
@@ -554,11 +554,7 @@ void find_all_runs(
           res.save_density_and_score_dist(
             s, ref, strand, cache_hit->density, cache_hit->score_dist, opts.max_len);
 
-          if (pqs_storage.best.score && s >= pqs_storage.best.e)
-          {// Export PQS because no further overlapping pqs can be found
-            pqs_storage.export_pqs(res, ref, strand);
-          }
-          pqs_storage.insert(cache_hit->score, s, s + cache_hit->len);
+          pqs_storage.insert_pqs(cache_hit->score, s, s + cache_hit->len, res, ref, strand);
           continue;
         }
       }
@@ -610,12 +606,6 @@ void find_all_runs(
           if (!flags.verbose)
             Rcout << "Search status: " << ceilf((m[0].first - ref)/(double)len*100) << " %\r" << flush;
         }
-
-        if (!opts.overlapping && pqs_storage.best.score && pqs_start >= pqs_storage.best.e)
-        {// Export PQS because no further overlapping pqs can be found
-          pqs_storage.export_pqs(res, ref, strand);
-        }
-
         score = 0;
         if (flags.use_default_scoring) {
           score = score_pqs(m, sc, opts);
@@ -632,11 +622,8 @@ void find_all_runs(
         }
         if (score && score >= opts.min_score) {
           // Current PQS satisfied all constraints.
-          if (!opts.overlapping) {
-            pqs_storage.insert(score, pqs_start, e);
-          } else {
-            res.save_pqs(score, pqs_start, e, ref, strand);
-          }
+          pqs_storage.insert_pqs(score, pqs_start, e, res, ref, strand);
+          
           for (int k = 0; k < e - pqs_start; ++k)
             ++pqs_cache.density[k];
 
@@ -662,6 +649,24 @@ void find_all_runs(
   }
 }
 
+/**
+ * Select between overlapping and non-overlapping storage.
+ * 
+ * @param overlapping If report overlapping PQS.
+ * @param ov Overlapping storage.
+ * @param nov Non-overlapping storage.
+ * @return Reference to storage interface.
+ */
+pqs_storage &select_pqs_storage(
+    bool overlapping,
+    pqs_storage_overlapping &ov,
+    pqs_storage_non_overlapping &nov)
+{
+  if (overlapping)
+    return ov;
+  else
+    return nov;
+}
 
 /**
  * Perform quadruplex search on given DNA sequence.
@@ -691,16 +696,17 @@ void pqs_search(
   pqs_cache::entry pqs_cache(opts.max_len);
   string::const_iterator pqs_start;
   int pqs_cnt = 0;
-  pqs_storage pqs_storage;
-
+  pqs_storage_overlapping pqs_storage_ov(seq.begin());
+  pqs_storage_non_overlapping pqs_storage_nov;
+  pqs_storage &pqs_storage = select_pqs_storage(opts.overlapping, pqs_storage_ov, pqs_storage_nov);
+  
   // Global sequence length is the only limit for the first G-run
   find_all_runs(
     subject, strand, 0, seq.begin(), seq.end(), m, run_re_c, opts, flags, sc,
     seq.begin(), seq.length(), pqs_start, pqs_storage, ctable,
     pqs_cache, pqs_cnt, res
   );
-  if (!opts.overlapping && pqs_storage.best.score)
-    pqs_storage.export_pqs(res, seq.begin(), strand);
+  pqs_storage.export_pqs(res, seq.begin(), strand);
 }
 
 
