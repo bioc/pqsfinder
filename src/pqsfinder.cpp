@@ -187,8 +187,11 @@ inline int score_run_defects(const int pi, const int w[], const int g[], int l[]
  */
 inline int score_pqs(const run_match m[], const scoring &sc, const opts_t &opts)
 {
-  int w[RUN_CNT], g[RUN_CNT], l[RUN_CNT - 1], l_tmp[RUN_CNT - 1];
-  int score = 0, tmp_score = 0;
+  int w[RUN_CNT], g[RUN_CNT], l[RUN_CNT - 1];
+  int l_tmp[RUN_CNT][RUN_CNT - 1];
+  int tmp_score[RUN_CNT];
+  
+  int score = 0;
 
   w[0] = m[0].length();
   w[1] = m[1].length();
@@ -204,32 +207,102 @@ inline int score_pqs(const run_match m[], const scoring &sc, const opts_t &opts)
   l[1] = m[2].first - m[1].second;
   l[2] = m[3].first - m[2].second;
   
-  bool has_one_perfect = false;
-  
-  for (int i = 0; i < RUN_CNT; ++i) {
-    if (g[i] == w[i]) {
-      // perfect run, use as a possible reference.
-      has_one_perfect = true;
-      l_tmp[0] = l[0];
-      l_tmp[1] = l[1];
-      l_tmp[2] = l[2];
-      tmp_score = score_run_defects(i, g, w, l_tmp, sc, opts);
-      
-      if (tmp_score > score) {
-        score = tmp_score;
-        l[0] = l_tmp[0];
-        l[1] = l_tmp[1];
-        l[2] = l_tmp[2];
-      }
-    }
-  }
-  if (!has_one_perfect || score == 0) {
+  l_tmp[0][0] = l[0];
+  l_tmp[0][1] = l[1];
+  l_tmp[0][2] = l[2];
+  l_tmp[1][0] = l[0];
+  l_tmp[1][1] = l[1];
+  l_tmp[1][2] = l[2];
+  l_tmp[2][0] = l[0];
+  l_tmp[2][1] = l[1];
+  l_tmp[2][2] = l[2];
+  l_tmp[3][0] = l[0];
+  l_tmp[3][1] = l[1];
+  l_tmp[3][2] = l[2];
+
+  tmp_score[0] = g[0] == w[0] ? score_run_defects(0, w, g, l_tmp[0], sc, opts) : 0;
+  tmp_score[1] = g[1] == w[1] ? score_run_defects(1, w, g, l_tmp[1], sc, opts) : 0;
+  tmp_score[2] = g[2] == w[2] ? score_run_defects(2, w, g, l_tmp[2], sc, opts) : 0;
+  tmp_score[3] = g[3] == w[3] ? score_run_defects(3, w, g, l_tmp[3], sc, opts) : 0;
+
+  int max_i = 0;
+  max_i = tmp_score[1] > tmp_score[max_i] ? 1 : max_i;
+  max_i = tmp_score[2] > tmp_score[max_i] ? 2 : max_i;
+  max_i = tmp_score[3] > tmp_score[max_i] ? 3 : max_i;
+
+  score = tmp_score[max_i];
+  if (score == 0) {
     return 0;
   }
+  l[0] = l_tmp[max_i][0];
+  l[1] = l_tmp[max_i][1];
+  l[2] = l_tmp[max_i][2];
+  
   int mean = (l[0] + l[1] + l[2])/3;
   int d1 = (l[0] - mean)*(l[0] - mean);
   int d2 = (l[1] - mean)*(l[1] - mean);
   int d3 = (l[2] - mean)*(l[2] - mean);
+  int sd = sqrt((d1 + d2 + d3)/2.0);
+  
+  return max(
+    score - (int) (sc.loop_mean_factor * pow(mean, sc.loop_mean_exponent))
+    - (int) (sc.loop_sd_factor * sd),
+    0);
+}
+
+
+inline int score_pqs_old(const run_match m[], const scoring &sc) {
+  int w[RUN_CNT], g[RUN_CNT];
+  int pi = -1, mismatches = 0, bulges = 0, perfects = 0;
+  int score = 0;
+  
+  w[0] = m[0].length();
+  w[1] = m[1].length();
+  w[2] = m[2].length();
+  w[3] = m[3].length();
+  
+  g[0] = count_g_num(m[0]);
+  g[1] = count_g_num(m[1]);
+  g[2] = count_g_num(m[2]);
+  g[3] = count_g_num(m[3]);
+  
+  pi = (g[0] == w[0]) ? 0 : pi;
+  pi = (g[1] == w[1] && (pi == -1 || w[1] < w[pi])) ? 1 : pi;
+  pi = (g[2] == w[2] && (pi == -1 || w[2] < w[pi])) ? 2 : pi;
+  pi = (g[3] == w[3] && (pi == -1 || w[3] < w[pi])) ? 3 : pi;
+  
+  if (pi < 0)
+  {// at least one run has to be perfect
+    return 0;
+  }
+  for (int i = 0; i < RUN_CNT; ++i) {
+    if (w[i] == w[pi] && g[i] == g[pi])
+      ++perfects;
+    else if (w[i] == w[pi] && g[i] == g[pi] - 1)
+      ++mismatches;
+    else if (w[i] > w[pi] && g[i] >= g[pi] && *(m[i].first) == 'G' && *(m[i].second - 1) == 'G')
+      ++bulges;
+    else {
+      return 0;
+    }
+  }
+  if (mismatches <= sc.max_mimatches && bulges <= sc.max_bulges && mismatches + bulges <= sc.max_defects)
+    score = (w[pi] - 1) * sc.tetrad_bonus - mismatches * sc.mismatch_penalty - bulges * sc.bulge_penalty;
+  else
+    return 0;
+  
+  int l1, l2, l3;
+  l1 = m[1].first - m[0].second;
+  l2 = m[2].first - m[1].second;
+  l3 = m[3].first - m[2].second;
+  
+  int mean = (l1 + l2 + l3)/3;
+  
+  int d1, d2, d3;
+  d1 = (l1 - mean)*(l1 - mean);
+  d2 = (l2 - mean)*(l2 - mean);
+  d3 = (l3 - mean)*(l3 - mean);
+  
   int sd = sqrt((d1 + d2 + d3)/2.0);
   
   return max(
@@ -546,8 +619,9 @@ void find_all_runs(
         score = 0;
         if (flags.use_default_scoring) {
           score = score_pqs(m, sc, opts);
-          //score_run_content(score, m, sc, opts);
-          //score_loop_lengths(score, m, sc);
+          // score = score_pqs_old(m, sc);
+          // score_run_content(score, m, sc);
+          // score_loop_lengths(score, m, sc);
         }
         if ((score || !flags.use_default_scoring) && sc.custom_scoring_fn != NULL) {
           check_custom_scoring_fn(score, m, sc, subject, ref);
