@@ -79,6 +79,7 @@ typedef struct opts {
   int max_len;
   int min_score;
   int run_min_len;
+  int run_min_len_real;
   int run_max_len;
   int loop_min_len;
   int loop_max_len;
@@ -220,10 +221,10 @@ inline int score_pqs(const run_match m[], const scoring &sc, const opts_t &opts)
   l_tmp[3][1] = l[1];
   l_tmp[3][2] = l[2];
 
-  tmp_score[0] = g[0] == w[0] ? score_run_defects(0, w, g, l_tmp[0], sc, opts) : 0;
-  tmp_score[1] = g[1] == w[1] ? score_run_defects(1, w, g, l_tmp[1], sc, opts) : 0;
-  tmp_score[2] = g[2] == w[2] ? score_run_defects(2, w, g, l_tmp[2], sc, opts) : 0;
-  tmp_score[3] = g[3] == w[3] ? score_run_defects(3, w, g, l_tmp[3], sc, opts) : 0;
+  tmp_score[0] = g[0] == w[0] && w[0] >= opts.run_min_len_real ? score_run_defects(0, w, g, l_tmp[0], sc, opts) : 0;
+  tmp_score[1] = g[1] == w[1] && w[1] >= opts.run_min_len_real ? score_run_defects(1, w, g, l_tmp[1], sc, opts) : 0;
+  tmp_score[2] = g[2] == w[2] && w[2] >= opts.run_min_len_real ? score_run_defects(2, w, g, l_tmp[2], sc, opts) : 0;
+  tmp_score[3] = g[3] == w[3] && w[3] >= opts.run_min_len_real ? score_run_defects(3, w, g, l_tmp[3], sc, opts) : 0;
 
   int max_i = 0;
   max_i = tmp_score[1] > tmp_score[max_i] ? 1 : max_i;
@@ -251,7 +252,7 @@ inline int score_pqs(const run_match m[], const scoring &sc, const opts_t &opts)
 }
 
 
-inline int score_pqs_old(const run_match m[], const scoring &sc) {
+inline int score_pqs_old(const run_match m[], const scoring &sc, const opts_t &opts) {
   int w[RUN_CNT], g[RUN_CNT];
   int pi = -1, mismatches = 0, bulges = 0, perfects = 0;
   int score = 0;
@@ -266,10 +267,10 @@ inline int score_pqs_old(const run_match m[], const scoring &sc) {
   g[2] = count_g_num(m[2]);
   g[3] = count_g_num(m[3]);
   
-  pi = (g[0] == w[0]) ? 0 : pi;
-  pi = (g[1] == w[1] && (pi == -1 || w[1] < w[pi])) ? 1 : pi;
-  pi = (g[2] == w[2] && (pi == -1 || w[2] < w[pi])) ? 2 : pi;
-  pi = (g[3] == w[3] && (pi == -1 || w[3] < w[pi])) ? 3 : pi;
+  pi = (g[0] == w[0] && w[0] >= opts.run_min_len_real) ? 0 : pi;
+  pi = (g[1] == w[1] && w[1] >= opts.run_min_len_real && (pi == -1 || w[1] < w[pi])) ? 1 : pi;
+  pi = (g[2] == w[2] && w[2] >= opts.run_min_len_real && (pi == -1 || w[2] < w[pi])) ? 2 : pi;
+  pi = (g[3] == w[3] && w[3] >= opts.run_min_len_real && (pi == -1 || w[3] < w[pi])) ? 3 : pi;
   
   if (pi < 0)
   {// at least one run has to be perfect
@@ -609,7 +610,7 @@ void find_all_runs(
         score = 0;
         if (flags.use_default_scoring) {
           score = score_pqs(m, sc, opts);
-          // score = score_pqs_old(m, sc);
+          // score = score_pqs_old(m, sc, opts);
           // score_run_content(score, m, sc);
           // score_loop_lengths(score, m, sc);
         }
@@ -801,10 +802,10 @@ SEXP pqsfinder(
     stop("Minimal PQS score has to be a positive value.");
   }
 
-  if (run_min_len < 0)
-    stop("Minimal PQS run length has to be non-negative value.");
-  if (run_max_len < 0)
-    stop("Maximal PQS run length has to be non-negative value.");
+  if (run_min_len < 2)
+    stop("Minimal PQS run length has to be greater than 2 or equal.");
+  if (run_max_len < 2)
+    stop("Maximal PQS run length has to be greater than 2 or equal.");
   if (run_min_len > run_max_len)
     stop("Minimal PQS run length can't be greater than maximal PQS run length.");
 
@@ -851,8 +852,13 @@ SEXP pqsfinder(
   opts.loop_max_len = loop_max_len;
   opts.loop_min_len = loop_min_len;
   opts.run_max_len = run_max_len;
-  opts.run_min_len = run_min_len;
-
+  if (run_min_len > 2) {
+    opts.run_min_len = run_min_len - 1;
+    opts.run_min_len_real = run_min_len;
+  } else {
+    opts.run_min_len = run_min_len;
+    opts.run_min_len_real = run_min_len;
+  }
   scoring sc;
   sc.tetrad_bonus = tetrad_bonus;
   sc.bulge_penalty = bulge_penalty;
