@@ -586,7 +586,7 @@ SEXP pqsfinder(
     int min_score = 42,
     int run_min_len = 3,
     int run_max_len = 11,
-    int loop_min_len = 0,
+    int loop_min_len = 1,
     int loop_max_len = 30,
     int max_bulges = 3,
     int max_mismatches = 2,
