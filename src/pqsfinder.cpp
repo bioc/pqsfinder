@@ -588,7 +588,7 @@ void find_all_runs(
   for (s = start; s < end; s++)
   {
     if (i == 0)
-    {// Specific code for the first run matching
+    {// specific code for the first run matching
       if (flags.use_cache && pqs_cache.density[0] > pqs_cache::use_treshold)
       {
         cache_hit = ctable.get(s, min(s + opts.max_len, end));
@@ -605,9 +605,9 @@ void find_all_runs(
           continue;
         }
       }
-      // Reset score of best PQS starting at current position
+      // reset score of best PQS starting at current position
       pqs_cache.score = 0;
-      // Reset density and score distribution
+      // reset density and score distribution
       for (int k = 0; k < opts.max_len; ++k) {
         pqs_cache.density[k] = 0;
         pqs_cache.score_dist[k] = 0;
@@ -617,7 +617,7 @@ void find_all_runs(
 
     for (e = end; e >= min_e && find_run(s, e, m[i], run_re_c, opts, flags); e--)
     {
-      // Update search bounds
+      // update search bounds
       s = m[i].first;
       e = m[i].second;
 
@@ -625,7 +625,7 @@ void find_all_runs(
         return; // skip too long loops
 
       if (i == 0)
-        // Enforce G4 total length limit to be relative to the first G-run start
+        // enforce G4 total length limit to be relative to the first G-run start
         find_all_runs(
           subject, strand, i+1, e, min(s + opts.max_len, end), m, run_re_c,
           opts, flags, sc, ref, len, s, pqs_storage, ctable, pqs_cache,
@@ -685,7 +685,7 @@ void find_all_runs(
       if (flags.use_cache && pqs_cache.density[0] > pqs_cache::use_treshold)
         ctable.put(s, min(s + opts.max_len, end), pqs_cache);
 
-      // Add locally accumulated density to global density array
+      // add locally accumulated density to global density array
       res.save_density_and_score_dist(
         s, ref, strand, pqs_cache.density, pqs_cache.score_dist, opts.max_len);
     }
