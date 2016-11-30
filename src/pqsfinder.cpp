@@ -146,6 +146,18 @@ void count_g(std::string seq) {
 }
 
 
+/**
+ * Score run defects relative to the reference G-run.
+ * 
+ * @param pi Index of the reference G-run.
+ * @param w Run widths.
+ * @param g G contents.
+ * @param l Run lenghts.
+ * @param pqs_ends Output array indicating extension of the PQS start or end.
+ * @param sc Scoring options.
+ * @param opts Algorithm options.
+ * @return Scoring for G-runs.
+ */
 inline int score_run_defects(
     const int pi,
     const int w[],
@@ -277,162 +289,6 @@ inline int score_pqs(
 }
 
 
-inline int score_pqs_old(const run_match m[], const scoring &sc, const opts_t &opts) {
-  int w[RUN_CNT], g[RUN_CNT];
-  int pi = -1, mismatches = 0, bulges = 0, perfects = 0;
-  int score = 0;
-  
-  w[0] = m[0].length();
-  w[1] = m[1].length();
-  w[2] = m[2].length();
-  w[3] = m[3].length();
-  
-  g[0] = count_g_num(m[0]);
-  g[1] = count_g_num(m[1]);
-  g[2] = count_g_num(m[2]);
-  g[3] = count_g_num(m[3]);
-  
-  pi = (g[0] == w[0] && w[0] >= opts.run_min_len_real) ? 0 : pi;
-  pi = (g[1] == w[1] && w[1] >= opts.run_min_len_real && (pi == -1 || w[1] < w[pi])) ? 1 : pi;
-  pi = (g[2] == w[2] && w[2] >= opts.run_min_len_real && (pi == -1 || w[2] < w[pi])) ? 2 : pi;
-  pi = (g[3] == w[3] && w[3] >= opts.run_min_len_real && (pi == -1 || w[3] < w[pi])) ? 3 : pi;
-  
-  if (pi < 0)
-  {// at least one run has to be perfect
-    return 0;
-  }
-  for (int i = 0; i < RUN_CNT; ++i) {
-    if (w[i] == w[pi] && g[i] == g[pi])
-      ++perfects;
-    else if (w[i] == w[pi] && g[i] == g[pi] - 1)
-      ++mismatches;
-    else if (w[i] > w[pi] && g[i] >= g[pi] && *(m[i].first) == 'G' && *(m[i].second - 1) == 'G')
-      ++bulges;
-    else {
-      return 0;
-    }
-  }
-  if (mismatches <= sc.max_mimatches && bulges <= sc.max_bulges && mismatches + bulges <= sc.max_defects)
-    score = (w[pi] - 1) * sc.tetrad_bonus - mismatches * sc.mismatch_penalty - bulges * sc.bulge_penalty;
-  else
-    return 0;
-  
-  int l1, l2, l3;
-  l1 = m[1].first - m[0].second;
-  l2 = m[2].first - m[1].second;
-  l3 = m[3].first - m[2].second;
-  
-  int mean = (l1 + l2 + l3)/3;
-  
-  int d1, d2, d3;
-  d1 = (l1 - mean)*(l1 - mean);
-  d2 = (l2 - mean)*(l2 - mean);
-  d3 = (l3 - mean)*(l3 - mean);
-  
-  int sd = sqrt((d1 + d2 + d3)/2.0);
-  
-  return max(
-    score - (int) (sc.loop_mean_factor * pow(mean, sc.loop_mean_exponent))
-    - (int) (sc.loop_sd_factor * sd),
-    0);
-}
-
-/**
- * Score run content.
- *
- * @param score Quadruplex score.
- * @param m Quadruples runs.
- * @param sc Scoring table.
- */
-inline void score_run_content(int &score, const run_match m[], const scoring &sc)
-{
-  int w[RUN_CNT], g[RUN_CNT];
-  int pi = -1, mismatches = 0, bulges = 0, perfects = 0;
-  
-  w[0] = m[0].length();
-  w[1] = m[1].length();
-  w[2] = m[2].length();
-  w[3] = m[3].length();
-  
-  /*
-  * Allowed length combinations:
-  * r r r r
-  * R r r r
-  * r R r r
-  * r r R r
-  * r r r R
-  */
-  if (sc.max_bulges == 1 && !(
-    (w[0] == w[1] && w[0] == w[2] && w[0] == w[3]) ||
-      (w[0] >  w[1] && w[1] == w[2] && w[1] == w[3]) ||
-      (w[0] <  w[1] && w[0] == w[2] && w[0] == w[3]) ||
-      (w[0] == w[1] && w[1] <  w[2] && w[0] == w[3]) ||
-      (w[0] == w[1] && w[0] == w[2] && w[0] <  w[3])
-  )) {
-    score = 0;
-    return;
-  }
-  
-  for (int i = 0; i < RUN_CNT; ++i) {
-    g[i] = count_g_num(m[i]);
-    if (g[i] == w[i] && (pi == -1 || w[i] < w[pi]))
-      pi = i;
-  }
-  if (pi < 0)
-  {// at least one run has to be perfect
-    score = 0;
-    return;
-  }
-  for (int i = 0; i < RUN_CNT; ++i) {
-    if (w[i] == w[pi] && g[i] == g[pi])
-      ++perfects;
-    else if (w[i] == w[pi] && g[i] == g[pi] - 1)
-      ++mismatches;
-    else if (w[i] > w[pi] && g[i] >= g[pi] && *(m[i].first) == 'G' && *(m[i].second - 1) == 'G')
-      ++bulges;
-    else {
-      score = 0;
-      return;
-    }
-  }
-  if (mismatches <= sc.max_mimatches && bulges <= sc.max_bulges && mismatches + bulges <= sc.max_defects)
-    score = (w[pi] - 1) * sc.tetrad_bonus - mismatches * sc.mismatch_penalty - bulges * sc.bulge_penalty;
-  else
-    score = 0;
-}
-
-/**
- * Check loop lengths
- *
- * @param score Quadruplex score
- * @param m Quadruples runs
- */
-inline void score_loop_lengths(int &score, const run_match m[], const scoring &sc)
-{
-  if (score == 0)
-    return;
-
-  int l1, l2, l3;
-  l1 = m[1].first - m[0].second;
-  l2 = m[2].first - m[1].second;
-  l3 = m[3].first - m[2].second;
-
-  int mean = (l1 + l2 + l3)/3;
-
-  int d1, d2, d3;
-  d1 = (l1 - mean)*(l1 - mean);
-  d2 = (l2 - mean)*(l2 - mean);
-  d3 = (l3 - mean)*(l3 - mean);
-
-  int sd = sqrt((d1 + d2 + d3)/2.0);
-
-  score = max(
-    score - (int) (sc.loop_mean_factor * pow(mean, sc.loop_mean_exponent))
-          - (int) (sc.loop_sd_factor * sd),
-    0);
-}
-
-
 /**
  * Check user scoring function
  *
@@ -471,6 +327,15 @@ inline void check_custom_scoring_fn(
 }
 
 
+/**
+ * Run Boost regex engine.
+ * 
+ * @param start Start position.
+ * @param end End position.
+ * @param boost_m Boost output array.
+ * @param run_re_c Regular expression.
+ * @return Status.
+ */
 inline bool run_regex_search(
     const string::const_iterator &start,
     const string::const_iterator &end,
