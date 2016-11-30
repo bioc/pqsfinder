@@ -37,7 +37,6 @@ using namespace std;
 
 // Implementation constants
 static const int RUN_CNT = 4;
-static const int CHECK_INT_PERIOD = 2e7;
 
 
 class scoring {
@@ -83,6 +82,7 @@ typedef struct opts {
   int run_max_len;
   int loop_min_len;
   int loop_max_len;
+  int check_int_period;
 } opts_t;
 
 // Class representing one run from quadruplex
@@ -446,6 +446,20 @@ inline void check_custom_scoring_fn(
 }
 
 
+inline bool run_regex_search(
+    const string::const_iterator &start,
+    const string::const_iterator &end,
+    boost::smatch &boost_m,
+    const boost::regex &run_re_c)
+{
+  try {
+    return boost::regex_search(start, end, boost_m, run_re_c, boost::match_default);
+  } catch (bad_alloc &ba) {
+    stop(string("Regexp engine failed with exception: ") + ba.what());
+    return false;
+  }
+}
+
 /**
  * Perform run search on particular sequence region
  *
@@ -458,8 +472,8 @@ inline void check_custom_scoring_fn(
  * @return True on success, false otherwise
  */
 inline bool find_run(
-    const string::const_iterator start,
-    const string::const_iterator end,
+    const string::const_iterator &start,
+    const string::const_iterator &end,
     run_match &m,
     const boost::regex &run_re_c,
     const opts_t &opts,
@@ -467,20 +481,28 @@ inline bool find_run(
 {
   if (flags.use_re) {
     static boost::smatch boost_m;
-    bool status = false;
-    try {
-      status = boost::regex_search(start, end, boost_m, run_re_c, boost::match_default);
-    } catch (bad_alloc &ba) {
-      stop(string("Regexp engine failed with exception: ") + ba.what());
-    }
+    string::const_iterator s, e;
+    bool status = run_regex_search(start, end, boost_m, run_re_c);
+    
     if (status) {
-      m.first = boost_m[0].first;
-      m.second = boost_m[0].second;
-      if (m.length() < opts.run_min_len) {
+      if (boost_m[0].second - boost_m[0].first > opts.run_max_len) {
+        // too long run found, search again with limited end
+        s = boost_m[0].first;
+        e = min(s + opts.run_max_len, end);
+        status = run_regex_search(s, e, boost_m, run_re_c);
+        if (!status) {
+          return false;
+        }
+      }
+      if (boost_m[0].second - boost_m[0].first < opts.run_min_len) {
         return false;
       }
+      m.first = boost_m[0].first;
+      m.second = boost_m[0].second;
+      return true;
+    } else {
+      return false;
     }
-    return status;
   } else {
     string::const_iterator s = start, e;
     
@@ -574,10 +596,6 @@ void find_all_runs(
       s = m[i].first;
       e = m[i].second;
 
-      if (m[i].length() > opts.run_max_len) {
-        e = s + opts.run_max_len; // skip too long G-runs, can be improved in <find_run>
-        continue; // error, will subtract one more from <e>
-      }
       if (i > 0 && s - m[i-1].second > opts.loop_max_len)
         return; // skip too long loops
 
@@ -596,7 +614,7 @@ void find_all_runs(
       else {
         /* Check user interrupt after reasonable amount of PQS identified to react
          * on important user signals. I.e. he might want to abort the computation. */
-        if (++pqs_cnt == CHECK_INT_PERIOD)
+        if (++pqs_cnt == opts.check_int_period)
         {
           pqs_cnt = 0;
           checkUserInterrupt();
@@ -833,7 +851,7 @@ SEXP pqsfinder(
   flags.use_cache = overlapping ? false : true;
   flags.use_re = false;
   flags.use_prof = false;
-  flags.debug = false;
+  flags.debug = true;
   flags.verbose = verbose;
   flags.use_default_scoring = use_default_scoring;
 
@@ -854,6 +872,11 @@ SEXP pqsfinder(
   } else {
     opts.run_min_len = run_min_len;
     opts.run_min_len_real = run_min_len;
+  }
+  if (flags.use_re) {
+    opts.check_int_period = 1e6;
+  } else {
+    opts.check_int_period = 2e7;
   }
   scoring sc;
   sc.tetrad_bonus = tetrad_bonus;
