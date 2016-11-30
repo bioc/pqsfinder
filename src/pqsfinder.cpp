@@ -465,12 +465,9 @@ inline bool find_run(
     const opts_t &opts,
     const flags_t &flags)
 {
-  static boost::smatch boost_m;
-  bool status = false;
-
-  string::const_iterator s = start, e;
-
   if (flags.use_re) {
+    static boost::smatch boost_m;
+    bool status = false;
     try {
       status = boost::regex_search(start, end, boost_m, run_re_c, boost::match_default);
     } catch (bad_alloc &ba) {
@@ -479,25 +476,27 @@ inline bool find_run(
     if (status) {
       m.first = boost_m[0].first;
       m.second = boost_m[0].second;
+      if (m.length() < opts.run_min_len) {
+        return false;
+      }
     }
+    return status;
   } else {
+    string::const_iterator s = start, e;
+    
     while (*s != 'G' && s < end) ++s;
     e = min(s + opts.run_max_len, end);
     --e; // <e> points to past-the-end character and as such should not be dereferenced
     while (*e != 'G' && e > s) --e;
 
-    status = (s < e); // this means that the run contains at least two guanines.
-    ++e; // correction to point on past-the-end character
-    if ((e - s) + 1 < opts.run_min_len)
-    // definitely too short to be run
-      status = false;
-
-    if (status) {
-      m.first = s;
-      m.second = e;
+    if (e - s + 1 < opts.run_min_len) {
+      // definitely too short to be a proper run
+      return false;
     }
+    m.first = s;
+    m.second = ++e; // correction to point on the past-the-end character
+    return true;
   }
-  return status;
 }
 
 
@@ -571,16 +570,13 @@ void find_all_runs(
 
     for (e = end; e >= min_e && find_run(s, e, m[i], run_re_c, opts, flags); e--)
     {
-      if (m[i].length() < opts.run_min_len)
-        break; // skip too short G-run, try next position
-
       // Update search bounds
       s = m[i].first;
       e = m[i].second;
 
       if (m[i].length() > opts.run_max_len) {
         e = s + opts.run_max_len; // skip too long G-runs, can be improved in <find_run>
-        continue;
+        continue; // error, will subtract one more from <e>
       }
       if (i > 0 && s - m[i-1].second > opts.loop_max_len)
         return; // skip too long loops
