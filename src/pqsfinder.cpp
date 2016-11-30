@@ -804,7 +804,7 @@ SEXP pqsfinder(
     double loop_mean_factor = 1,
     double loop_mean_exponent = 1,
     double loop_sd_factor = 1,
-    std::string run_re = "G{1,5}.{0,5}G{1,5}",
+    std::string run_re = "G{1,10}.{0,9}G{1,10}",
     SEXP custom_scoring_fn = R_NilValue,
     bool use_default_scoring = true,
     bool verbose = false)
@@ -855,7 +855,7 @@ SEXP pqsfinder(
   flags.verbose = verbose;
   flags.use_default_scoring = use_default_scoring;
 
-  if (run_re != "G{1,5}.{0,5}G{1,5}")
+  if (run_re != "G{1,10}.{0,9}G{1,10}")
     // User specified its own regexp, force to use regexp engine
     flags.use_re = true;
 

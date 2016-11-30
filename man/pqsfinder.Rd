@@ -10,7 +10,7 @@ pqsfinder(subject, strand = "*", overlapping = FALSE, max_len = 50L,
   max_mismatches = 2L, max_defects = 3L, tetrad_bonus = 45L,
   bulge_penalty = 20L, mismatch_penalty = 31L, loop_mean_factor = 1,
   loop_mean_exponent = 1, loop_sd_factor = 1,
-  run_re = "G{1,5}.{0,5}G{1,5}", custom_scoring_fn = NULL,
+  run_re = "G{1,10}.{0,9}G{1,10}", custom_scoring_fn = NULL,
   use_default_scoring = TRUE, verbose = FALSE)
 }
 \arguments{
