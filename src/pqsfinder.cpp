@@ -663,15 +663,15 @@ void find_all_runs(
             pqs_cache.score_dist[k] = max(pqs_cache.score_dist[k], score);
           }
           if (score >= opts.min_score) {
-            // Current PQS satisfied all constraints.
+            // current PQS satisfied all constraints
             pqs_storage.insert_pqs(score, m[0].first, m[3].second, res, ref, strand);
             
             for (int k = 0; k < pqs_len; ++k)
               ++pqs_cache.density[k];
             
             if (score > pqs_cache.score ||
-                (score == pqs_cache.score && pqs_cache.len < pqs_len)) {
-              // Update properties of caching candidate
+                (score == pqs_cache.score && pqs_len < pqs_cache.len)) {
+              // update properties of caching candidate
               pqs_cache.score = score;
               pqs_cache.len = pqs_len;
             }
