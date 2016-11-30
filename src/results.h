@@ -31,7 +31,7 @@ public:
   {
     this->density = (int *)calloc(seq_len, sizeof(int));
     if (this->density == NULL)
-      stop("Unable to allocate memory for results density vector.");
+      throw runtime_error("Unable to allocate memory for results density vector.");
   }
   ~results() {
     if (this->density != NULL)

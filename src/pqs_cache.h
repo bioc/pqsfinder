@@ -27,12 +27,12 @@ public:
     entry(const int max_len) : score(0), len(0), max_len(max_len) {
       this->density = (int *)calloc(this->max_len, sizeof(int));
       if (this->density == NULL)
-        stop("Unable to allocate memory for cache density vector.");
+        throw runtime_error("Unable to allocate memory for cache density vector.");
     }
     entry(const entry &obj) : score(obj.score), len(obj.len), max_len(obj.max_len) {
       this->density = (int *)malloc(this->max_len * sizeof(int));
       if (this->density == NULL)
-        stop("Unable to allocate memory for cache density vector.");
+        throw runtime_error("Unable to allocate memory for cache density vector.");
       memcpy(this->density, obj.density, this->max_len);
     }
     ~entry() {
