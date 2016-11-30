@@ -32,10 +32,10 @@ public:
   {
     this->density = (int *)calloc(seq_len, sizeof(int));
     if (this->density == NULL)
-      stop("Unable to allocate memory for results density vector.");
+      throw runtime_error("Unable to allocate memory for results density vector.");
     this->score_dist = (int *)calloc(seq_len, sizeof(int));
     if (this->score_dist == NULL)
-      stop("Unable to allocate memory for results score distribution vector.");
+      throw runtime_error("Unable to allocate memory for results score distribution vector.");
   }
   ~results() {
     if (this->density != NULL)

@@ -455,7 +455,7 @@ inline bool run_regex_search(
   try {
     return boost::regex_search(start, end, boost_m, run_re_c, boost::match_default);
   } catch (bad_alloc &ba) {
-    stop(string("Regexp engine failed with exception: ") + ba.what());
+    throw runtime_error(string("Regexp engine failed with exception: ") + ba.what());
     return false;
   }
 }
@@ -810,34 +810,33 @@ SEXP pqsfinder(
     bool verbose = false)
 {
   if (max_len < 1)
-    stop("Maximal length of PQS has to be a positive value.");
+    throw invalid_argument("Maximal length of PQS has to be a positive value.");
   if (min_score < 1) {
-    Rprintf("hello world\n");
-    stop("Minimal PQS score has to be a positive value.");
+    throw invalid_argument("Minimal PQS score has to be a positive value.");
   }
 
   if (run_min_len < 2)
-    stop("Minimal PQS run length has to be greater than 2 or equal.");
+    throw invalid_argument("Minimal PQS run length has to be greater than 2 or equal.");
   if (run_max_len < 2)
-    stop("Maximal PQS run length has to be greater than 2 or equal.");
+    throw invalid_argument("Maximal PQS run length has to be greater than 2 or equal.");
   if (run_min_len > run_max_len)
-    stop("Minimal PQS run length can't be greater than maximal PQS run length.");
+    throw invalid_argument("Minimal PQS run length can't be greater than the maximal PQS run length.");
 
   if (loop_min_len < 0)
-    stop("Minimal PQS loop length has to be non-negative value.");
+    throw invalid_argument("Minimal PQS loop length has to be a non-negative value.");
   if (loop_max_len < 0)
-    stop("Maximal PQS loop length has to be non-negative value.");
+    throw invalid_argument("Maximal PQS loop length has to be a non-negative value.");
   if (loop_min_len > loop_max_len)
-    stop("Minimal PQS loop length can't be greater than maximal PQS loop length.");
+    throw invalid_argument("Minimal PQS loop length can't be greater than the maximal PQS loop length.");
 
   if (max_bulges < 0 || max_bulges > 3)
-    stop("Maximum number of runs with bulges has to be from the range 0-3.");
+    throw invalid_argument("Maximum number of runs with bulges has to be from the range 0-3.");
   if (max_mismatches < 0 || max_mismatches > 3)
-    stop("Maximum number of runs with mismatches has to be from the range 0-3.");
+    throw invalid_argument("Maximum number of runs with mismatches has to be from the range 0-3.");
   if (max_defects < 0 || max_defects > 3)
-    stop("Maximum number of runs with defects (bulge or mismatch) has to be from the range 0-3.");
+    throw invalid_argument("Maximum number of runs with defects (bulge or mismatch) has to be from the range 0-3.");
   if (strand != "+" && strand != "-" && strand != "*")
-    stop("Strand specification must be +, - or *.");
+    throw invalid_argument("Strand specification must be +, - or *.");
 
   Function as_character("as.character");
   Function get_class("class");
@@ -845,7 +844,7 @@ SEXP pqsfinder(
   CharacterVector subject_class = as_character(get_class(subject));
 
   if (subject_class[0] != "DNAString")
-    stop("Subject must be DNAString object.");
+    throw invalid_argument("Subject must be DNAString object.");
 
   flags_t flags;
   flags.use_cache = overlapping ? false : true;

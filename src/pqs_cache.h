@@ -23,10 +23,10 @@ public:
     void init(const int max_len) {
       this->density = (int *)calloc(this->max_len, sizeof(int));
       if (this->density == NULL)
-        stop("Unable to allocate memory for cache density vector.");
+        throw runtime_error("Unable to allocate memory for cache density vector.");
       this->score_dist = (int *)calloc(this->max_len, sizeof(int));
       if (this->score_dist == NULL)
-        stop("Unable to allocate memory for cache score distribution vector.");
+        throw runtime_error("Unable to allocate memory for cache score distribution vector.");
     }
   public:
     int *density;
