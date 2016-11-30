@@ -146,7 +146,14 @@ void count_g(std::string seq) {
 }
 
 
-inline int score_run_defects(const int pi, const int w[], const int g[], int l[], const scoring &sc, const opts_t &opts) {
+inline int score_run_defects(
+    const int pi,
+    const int w[],
+    const int g[],
+    int l[], int pqs_ends[],
+    const scoring &sc,
+    const opts_t &opts)
+{
   int mismatches = 0, bulges = 0, perfects = 0;
   for (int i = 0; i < RUN_CNT; ++i) {
     if (w[i] == w[pi] && g[i] == g[pi])
@@ -154,7 +161,9 @@ inline int score_run_defects(const int pi, const int w[], const int g[], int l[]
     else if ((w[i] == w[pi] && g[i] == g[pi] - 1))
       ++mismatches;
     else if (w[i] == w[pi] - 1 && g[i] == g[pi] - 1) {
-      if (i == 1 || i == 2) {
+      if (i == 0) {
+        pqs_ends[0] = 1;
+      } else if (i == 1 || i == 2) {
         // check if loops are able to absorb the mismatches
         if (l[i-1] > opts.loop_min_len) {
           --l[i-1];
@@ -163,6 +172,8 @@ inline int score_run_defects(const int pi, const int w[], const int g[], int l[]
         } else {
           return 0;
         }
+      } else if (i == 3) {
+        pqs_ends[1] = 1;
       }
       ++mismatches;
     }
@@ -186,10 +197,15 @@ inline int score_run_defects(const int pi, const int w[], const int g[], int l[]
  * @param opts Algorithm options.
  * @return Quadruplex score.
  */
-inline int score_pqs(const run_match m[], const scoring &sc, const opts_t &opts)
+inline int score_pqs(
+    run_match m[],
+    const string::const_iterator start,
+    const string::const_iterator end,
+    const scoring &sc, const opts_t &opts)
 {
   int w[RUN_CNT], g[RUN_CNT], l[RUN_CNT - 1];
   int l_tmp[RUN_CNT][RUN_CNT - 1];
+  int pqs_ends[RUN_CNT][2] = {0};
   int tmp_score[RUN_CNT];
   
   int score = 0;
@@ -221,10 +237,14 @@ inline int score_pqs(const run_match m[], const scoring &sc, const opts_t &opts)
   l_tmp[3][1] = l[1];
   l_tmp[3][2] = l[2];
 
-  tmp_score[0] = g[0] == w[0] && w[0] >= opts.run_min_len_real ? score_run_defects(0, w, g, l_tmp[0], sc, opts) : 0;
-  tmp_score[1] = g[1] == w[1] && w[1] >= opts.run_min_len_real ? score_run_defects(1, w, g, l_tmp[1], sc, opts) : 0;
-  tmp_score[2] = g[2] == w[2] && w[2] >= opts.run_min_len_real ? score_run_defects(2, w, g, l_tmp[2], sc, opts) : 0;
-  tmp_score[3] = g[3] == w[3] && w[3] >= opts.run_min_len_real ? score_run_defects(3, w, g, l_tmp[3], sc, opts) : 0;
+  tmp_score[0] = g[0] == w[0] && w[0] >= opts.run_min_len_real ?
+                  score_run_defects(0, w, g, l_tmp[0], pqs_ends[0], sc, opts) : 0;
+  tmp_score[1] = g[1] == w[1] && w[1] >= opts.run_min_len_real ?
+                  score_run_defects(1, w, g, l_tmp[1], pqs_ends[1], sc, opts) : 0;
+  tmp_score[2] = g[2] == w[2] && w[2] >= opts.run_min_len_real ?
+                  score_run_defects(2, w, g, l_tmp[2], pqs_ends[2], sc, opts) : 0;
+  tmp_score[3] = g[3] == w[3] && w[3] >= opts.run_min_len_real ?
+                  score_run_defects(3, w, g, l_tmp[3], pqs_ends[3], sc, opts) : 0;
 
   int max_i = 0;
   max_i = tmp_score[1] > tmp_score[max_i] ? 1 : max_i;
@@ -239,6 +259,11 @@ inline int score_pqs(const run_match m[], const scoring &sc, const opts_t &opts)
   l[1] = l_tmp[max_i][1];
   l[2] = l_tmp[max_i][2];
   
+  m[0].first = max(m[0].first - pqs_ends[max_i][0], start);
+  m[3].second = min(m[3].second + pqs_ends[max_i][1], end);
+  if (m[3].second - m[0].first > opts.max_len) {
+    return 0;
+  }
   int mean = (l[0] + l[1] + l[2])/3;
   int d1 = (l[0] - mean)*(l[0] - mean);
   int d2 = (l[1] - mean)*(l[1] - mean);
@@ -623,7 +648,7 @@ void find_all_runs(
         }
         score = 0;
         if (flags.use_default_scoring) {
-          score = score_pqs(m, sc, opts);
+          score = score_pqs(m, ref, end, sc, opts);
           // score = score_pqs_old(m, sc, opts);
           // score_run_content(score, m, sc);
           // score_loop_lengths(score, m, sc);
@@ -632,24 +657,27 @@ void find_all_runs(
           check_custom_scoring_fn(score, m, sc, subject, ref);
         }
         if (score) {
-          for (int k = 0; k < e - pqs_start; ++k)
-            pqs_cache.score_dist[k] = max(pqs_cache.score_dist[k], score);
-        }
-        if (score && score >= opts.min_score) {
-          // Current PQS satisfied all constraints.
-          pqs_storage.insert_pqs(score, pqs_start, e, res, ref, strand);
+          int pqs_len = m[3].second - m[0].first;
           
-          for (int k = 0; k < e - pqs_start; ++k)
-            ++pqs_cache.density[k];
-
-          if (score > pqs_cache.score ||
-              (score == pqs_cache.score && pqs_cache.len < e - pqs_start)) {
-            // Update properties of caching candidate
-            pqs_cache.score = score;
-            pqs_cache.len = e - pqs_start;
+          for (int k = 0; k < pqs_len; ++k) {
+            pqs_cache.score_dist[k] = max(pqs_cache.score_dist[k], score);
           }
-          if (flags.verbose)
-            print_pqs(m, score, ref, pqs_cache.density[0]);
+          if (score >= opts.min_score) {
+            // Current PQS satisfied all constraints.
+            pqs_storage.insert_pqs(score, m[0].first, m[3].second, res, ref, strand);
+            
+            for (int k = 0; k < pqs_len; ++k)
+              ++pqs_cache.density[k];
+            
+            if (score > pqs_cache.score ||
+                (score == pqs_cache.score && pqs_cache.len < pqs_len)) {
+              // Update properties of caching candidate
+              pqs_cache.score = score;
+              pqs_cache.len = pqs_len;
+            }
+            if (flags.verbose)
+              print_pqs(m, score, ref, pqs_cache.density[0]);
+          }
         }
       }
     }
