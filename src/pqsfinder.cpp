@@ -493,8 +493,8 @@ inline bool find_run(
       status = false;
 
     if (status) {
-      m.first = s;//max(s - 1, start); // if it is possible to extend one mismatch left, do it.
-      m.second = e;//min(min(e + 1, s + opts.run_max_len), end); // if it is possible to extend one mismatch right, do it.
+      m.first = s;
+      m.second = e;
     }
   }
   return status;
