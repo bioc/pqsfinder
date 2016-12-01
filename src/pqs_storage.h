@@ -11,6 +11,7 @@
 
 #include <Rcpp.h>
 #include "results.h"
+#include "features.h"
 
 using namespace Rcpp;
 using namespace std;
@@ -19,7 +20,7 @@ class pqs_storage {
 public:
   virtual ~pqs_storage() {};
   virtual void insert_pqs(
-      int score, string::const_iterator s, string::const_iterator e,
+      int score, string::const_iterator s, string::const_iterator e, features_t &f,
       results &res, const string::const_iterator &ref, const string &strand) = 0;
   virtual void export_pqs(
       results &res, const string::const_iterator &ref,
@@ -28,7 +29,11 @@ public:
 
 class pqs_storage_overlapping : public pqs_storage {
 private:
-  typedef map< string::const_iterator, int > map_t;
+  typedef struct {
+    int score;
+    features_t f;
+  } map_value_t;
+  typedef map< string::const_iterator, map_value_t > map_t;
   map_t pqs_map;
   string::const_iterator pqs_start;
   
@@ -36,7 +41,7 @@ public:
   pqs_storage_overlapping(string::const_iterator pqs_start) : pqs_start(pqs_start) {}
   
   virtual void insert_pqs(
-      int score, string::const_iterator s, string::const_iterator e,
+      int score, string::const_iterator s, string::const_iterator e, features_t &f,
       results &res, const string::const_iterator &ref, const string &strand)
   {
     if (this->pqs_start < s) {
@@ -45,13 +50,15 @@ public:
     }
     map_t::iterator it = pqs_map.find(e);
     if (it != pqs_map.end()) {
-      if (score > it->second) {
-        it->second = score;
+      if (score > it->second.score) {
+        it->second.score = score;
+        it->second.f = f;
       } else {
         return;
       }
     } else {
-      pqs_map.insert(make_pair(e, score));
+      map_value_t value = {score, f};
+      pqs_map.insert(make_pair(e, value));
     }
   }
   virtual void export_pqs(
@@ -59,7 +66,7 @@ public:
       const string &strand)
   {
     for (map_t::iterator it = this->pqs_map.begin(); it != this->pqs_map.end(); ++it) {
-      res.save_pqs(it->second, this->pqs_start, it->first, ref, strand);
+      res.save_pqs(it->second.score, this->pqs_start, it->first, it->second.f, ref, strand);
     }
     pqs_map.clear();
   }
@@ -71,8 +78,9 @@ private:
   public:
     string::const_iterator s;
     string::const_iterator e;
-    range(string::const_iterator s, string::const_iterator e) :
-      s(s), e(e) {};
+    features_t f;
+    range(string::const_iterator &s, string::const_iterator &e, features_t &f) :
+      s(s), e(e), f(f) {};
     range() {};
   };
   typedef map< int, list<range> > storage_t;
@@ -90,7 +98,7 @@ public:
     this->best.score = 0;
   }
   virtual void insert_pqs(
-      int score, string::const_iterator s, string::const_iterator e,
+      int score, string::const_iterator s, string::const_iterator e, features_t &f,
       results &res, const string::const_iterator &ref, const string &strand)
   {
     if (this->best.score && s >= this->best.e)
@@ -108,23 +116,22 @@ public:
     if (it != st.end()) {
       list<range> &list = it->second;
       if (list.empty()) {
-        list.push_back(range(s, e));
+        throw runtime_error("Inconsistent state of non-overlapping storage.");
       }
-      else {
-        range &last = list.back();
-        if (last.s <= s && e <= last.e) {
-          // Replace existing by shorter one
-          last.s = s;
-          last.e = e;
-        }
-        else if (last.e <= s) {
-          // Insert new non-overlapping pqs
-          list.push_back(range(s, e));
-        }
+      range &last = list.back();
+      if (last.s <= s && e <= last.e) {
+        // Replace existing by shorter one
+        last.s = s;
+        last.e = e;
+        last.f = f;
+      }
+      else if (last.e <= s) {
+        // Insert new non-overlapping pqs
+        list.push_back(range(s, e, f));
       }
     }
     else {
-      st.insert(storage_t::value_type(score, list<range>(1, range(s, e))));
+      st.insert(storage_t::value_type(score, list<range>(1, range(s, e, f))));
     }
   }
   virtual void export_pqs(
@@ -140,8 +147,8 @@ public:
     while (!st.empty()) {
       it = --st.end(); // decrement to point on last list
       best_pqs = it->second.back();
-
-      res.save_pqs(it->first, best_pqs.s, best_pqs.e, ref, strand);
+      
+      res.save_pqs(it->first, best_pqs.s, best_pqs.e, best_pqs.f, ref, strand);
 
       while (true) {
         // remove all overlapping PQS with lower score

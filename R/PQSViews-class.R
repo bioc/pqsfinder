@@ -21,7 +21,7 @@
   "PQSViews",
   contains = "XStringViews",
   slots = c(
-    density = "numeric",
+    density = "integer",
     score_distribution = "integer"
   ),
   validity = function(object) {
@@ -40,35 +40,52 @@
 #'
 #' User friendly constructor for PQSViews class representing potential
 #' quadruplex forming sequences (PQS). PQSViews is a subclass of
-#' \code{\link{XStringViews}} class and adds one more slot to store
-#' PQS density.
+#' \code{\link{XStringViews}} class and adds two more slots to store
+#' PQS density and PQS score distribution.
+#' 
+#' Use \code{\link{elementMetadata}} function to get extra PQS features
+#' like number of tetrads, bulges, mismatches or loop lengths.
 #'
 #' @param subject DNAString object.
-#' @param start Vector of PQS start positions.
-#' @param width Vector of PQS lengths.
-#' @param strand Vector of PQS strand specifications.
-#' @param score Vector of PQS scores.
+#' @param start Start positions.
+#' @param width Lengths.
+#' @param strand Strand specifications.
+#' @param score Scores.
 #' @param density Numbers of PQS overlapping at each position in \code{subject}.
 #' @param score_distribution Score of the best PQS found at each position.
+#' @param nt Tetrad numbers.
+#' @param nb Bulge counts.
+#' @param nm Mismatch counts.
+#' @param ll1 Loop 1 lengths.
+#' @param ll2 Loop 2 lengths.
+#' @param ll3 Loop 3 lengths.
 #' @return PQSViews object.
 #'
 #' @examples
-#' pv <- PQSViews(DNAString("CGGGCGGGGC"), 1:2, 2:3, "+", 10:11, 1:10, 1:10)
+#' pv <- PQSViews(DNAString("CGGGCGGGGC"), c(1,2), c(2,3), c("+", "+"),
+#'                c(10,11), 1:10, 1:10, 0, 0, 0, 1, 1, 1)
 #' start(pv)
 #' width(pv)
 #' strand(pv)
 #' score(pv)
 #' density(pv)
 #' scoreDistribution(pv)
+#' elementMetadata(pv)
 #'
 PQSViews <- function(
-  subject, start, width, strand, score, density, score_distribution)
+  subject, start, width, strand, score, density, score_distribution,
+  nt, nb, nm, ll1, ll2, ll3)
 {
   ix <- order(start)
-
-  .PQSViews(subject = subject, ranges = IRanges(start = start[ix], width = width[ix]),
-            elementMetadata = DataFrame(strand = strand[ix], score = score[ix]),
-            density = density, score_distribution = score_distribution)
+  .PQSViews(
+    subject = subject, ranges = IRanges(start = start[ix], width = width[ix]),
+    elementMetadata = DataFrame(
+      strand = strand[ix], score = score[ix], nt = nt[ix],
+      nb = nb[ix], nm = nm[ix], ll1 = ll1[ix],
+      ll2 = ll2[ix], ll3 = ll3[ix]
+    ),
+    density = density, score_distribution = score_distribution
+  )
 }
 
 
@@ -220,6 +237,12 @@ setMethod('scoreDistribution', 'PQSViews', function(x) x@score_distribution)
   cat("\n")
 }
 
+.get_nt <- function(pv) elementMetadata(pv)$nt
+.get_nb <- function(pv) elementMetadata(pv)$nb
+.get_nm <- function(pv) elementMetadata(pv)$nm
+.get_ll1 <- function(pv) elementMetadata(pv)$ll1
+.get_ll2 <- function(pv) elementMetadata(pv)$ll2
+.get_ll3 <- function(pv) elementMetadata(pv)$ll3
 
 ## Show all output table rows
 ## 'half_nrow' must be >= 1
@@ -235,8 +258,14 @@ setMethod('scoreDistribution', 'PQSViews', function(x) x@score_distribution)
     list(nm="start",  fn="start" ),
     list(nm="width",  fn="width" ),
     list(nm="score",  fn="score" ),
-    list(nm="strand", fn="strand")
-    #list(nm="pvalue", fn="pvalue", scientific=TRUE, digits=2),
+    list(nm="strand", fn="strand"),
+    list(nm="nt", fn=".get_nt"),
+    list(nm="nb", fn=".get_nb"),
+    list(nm="nm", fn=".get_nm")
+    # list(nm="ll1", fn=".get_ll1"),
+    # list(nm="ll2", fn=".get_ll2"),
+    # list(nm="ll3", fn=".get_ll3")
+    # list(nm="pvalue", fn="pvalue", scientific=TRUE, digits=2),
   )
 
   i <- 1
@@ -310,6 +339,12 @@ setAs("PQSViews", "DNAStringSet", function(from)
       "end=", end(from)[i], ";",
       "strand=", strand(from)[i], ";",
       "score=", score(from)[i], ";",
+      "nt=", .get_nt(from)[i], ";",
+      "nb=", .get_nb(from)[i], ";",
+      "nm=", .get_nm(from)[i], ";",
+      "ll1=", .get_ll1(from)[i], ";",
+      "ll2=", .get_ll2(from)[i], ";",
+      "ll3=", .get_ll3(from)[i], ";",
       sep=""
     )
   }
@@ -330,7 +365,13 @@ setAs("PQSViews", "GRanges", function(from)
     IRanges(start(from), end(from)),
     strand(from),
     score = score(from),
-    seqlengths = seqlen
+    seqlengths = seqlen,
+    nt = .get_nt(from),
+    nb = .get_nb(from),
+    nm = .get_nm(from),
+    ll1 = .get_ll1(from),
+    ll2 = .get_ll2(from),
+    ll3 = .get_ll3(from)
   )
 })
 

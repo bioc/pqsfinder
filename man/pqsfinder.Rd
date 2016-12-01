@@ -92,8 +92,15 @@ assigned to the particular PQS by all applied scoring functions.}
 Function for identification of all potential intramolecular quadruplex
 patterns (PQS) in DNA sequence.
 }
+\details{
+Use \code{\link{elementMetadata}} function to get extra PQS features
+like number of tetrads (nt), bulges (nb), mismatches (nm) or loop lengths
+(ll1, ll2, ll3).
+}
 \examples{
-pv <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGGAAAA"))
+pv <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGTAAAA"))
+pv
+elementMetadata(pv)
 
 }
 

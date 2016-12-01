@@ -11,6 +11,7 @@
 
 #include <Rcpp.h>
 #include <cstdlib>
+#include "features.h"
 
 using namespace Rcpp;
 using namespace std;
@@ -21,6 +22,12 @@ public:
   vector<int> len;
   vector<int> score;
   vector<string> strand;
+  vector<int> nt;
+  vector<int> nb;
+  vector<int> nm;
+  vector<int> ll1;
+  vector<int> ll2;
+  vector<int> ll3;
   int *density;
   int *score_dist;
 
@@ -45,8 +52,8 @@ public:
   }
   inline void save_pqs(
       const int score, const string::const_iterator &s,
-      const string::const_iterator &e, const string::const_iterator &ref,
-      const string &strand)
+      const string::const_iterator &e, features_t &f,
+      const string::const_iterator &ref, const string &strand)
   {
     if (score >= this->min_score) {
       if (strand == "+")
@@ -57,6 +64,12 @@ public:
       this->len.push_back(e - s);
       this->score.push_back(score);
       this->strand.push_back(strand);
+      this->nt.push_back(f.nt);
+      this->nb.push_back(f.nb);
+      this->nm.push_back(f.nm);
+      this->ll1.push_back(f.ll1);
+      this->ll2.push_back(f.ll2);
+      this->ll3.push_back(f.ll3);
     }
   }
   inline void save_density_and_score_dist(

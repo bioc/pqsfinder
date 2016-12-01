@@ -4,22 +4,35 @@
 \alias{PQSViews}
 \title{PQSViews class constructor}
 \usage{
-PQSViews(subject, start, width, strand, score, density, score_distribution)
+PQSViews(subject, start, width, strand, score, density, score_distribution, nt,
+  nb, nm, ll1, ll2, ll3)
 }
 \arguments{
 \item{subject}{DNAString object.}
 
-\item{start}{Vector of PQS start positions.}
+\item{start}{Start positions.}
 
-\item{width}{Vector of PQS lengths.}
+\item{width}{Lengths.}
 
-\item{strand}{Vector of PQS strand specifications.}
+\item{strand}{Strand specifications.}
 
-\item{score}{Vector of PQS scores.}
+\item{score}{Scores.}
 
 \item{density}{Numbers of PQS overlapping at each position in \code{subject}.}
 
 \item{score_distribution}{Score of the best PQS found at each position.}
+
+\item{nt}{Tetrad numbers.}
+
+\item{nb}{Bulge counts.}
+
+\item{nm}{Mismatch counts.}
+
+\item{ll1}{Loop 1 lengths.}
+
+\item{ll2}{Loop 2 lengths.}
+
+\item{ll3}{Loop 3 lengths.}
 }
 \value{
 PQSViews object.
@@ -27,17 +40,23 @@ PQSViews object.
 \description{
 User friendly constructor for PQSViews class representing potential
 quadruplex forming sequences (PQS). PQSViews is a subclass of
-\code{\link{XStringViews}} class and adds one more slot to store
-PQS density.
+\code{\link{XStringViews}} class and adds two more slots to store
+PQS density and PQS score distribution.
+}
+\details{
+Use \code{\link{elementMetadata}} function to get extra PQS features
+like number of tetrads, bulges, mismatches or loop lengths.
 }
 \examples{
-pv <- PQSViews(DNAString("CGGGCGGGGC"), 1:2, 2:3, "+", 10:11, 1:10, 1:10)
+pv <- PQSViews(DNAString("CGGGCGGGGC"), c(1,2), c(2,3), c("+", "+"),
+               c(10,11), 1:10, 1:10, 0, 0, 0, 1, 1, 1)
 start(pv)
 width(pv)
 strand(pv)
 score(pv)
 density(pv)
 scoreDistribution(pv)
+elementMetadata(pv)
 
 }
 

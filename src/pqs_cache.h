@@ -12,6 +12,7 @@
 
 #include <Rcpp.h>
 #include <cstdlib>
+#include "features.h"
 
 using namespace Rcpp;
 using namespace std;
@@ -33,11 +34,13 @@ public:
     int *score_dist;
     int score;
     int len;
+    features_t f;
     const int max_len;
     entry(const int max_len) : score(0), len(0), max_len(max_len) {
       init(max_len);
+      memset(&f, 0, sizeof(features_t));
     }
-    entry(const entry &obj) : score(obj.score), len(obj.len), max_len(obj.max_len) {
+    entry(const entry &obj) : score(obj.score), len(obj.len), max_len(obj.max_len), f(obj.f) {
       init(obj.max_len);
       memcpy(this->density, obj.density, this->max_len);
       memcpy(this->score_dist, obj.score_dist, this->max_len);

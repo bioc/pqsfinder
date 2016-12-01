@@ -18,6 +18,7 @@
 #include "results.h"
 #include "pqs_storage.h"
 #include "pqs_cache.h"
+#include "features.h"
 
 using namespace Rcpp;
 using namespace std;
@@ -154,6 +155,7 @@ void count_g(std::string seq) {
  * @param g G contents.
  * @param l Run lenghts.
  * @param pqs_ends Output array indicating extension of the PQS start or end.
+ * @param f PQS features.
  * @param sc Scoring options.
  * @param opts Algorithm options.
  * @return Scoring for G-runs.
@@ -162,7 +164,8 @@ inline int score_run_defects(
     const int pi,
     const int w[],
     const int g[],
-    int l[], int pqs_ends[],
+    int l[], bool pqs_ends[],
+    features_t &f,
     const scoring &sc,
     const opts_t &opts)
 {
@@ -174,7 +177,7 @@ inline int score_run_defects(
       ++mismatches;
     else if (w[i] == w[pi] - 1 && g[i] == g[pi] - 1) {
       if (i == 0) {
-        pqs_ends[0] = 1;
+        pqs_ends[0] = true;
       } else if (i == 1 || i == 2) {
         // check if loops are able to absorb the mismatches
         if (l[i-1] > opts.loop_min_len) {
@@ -185,7 +188,7 @@ inline int score_run_defects(
           return 0;
         }
       } else if (i == 3) {
-        pqs_ends[1] = 1;
+        pqs_ends[1] = true;
       }
       ++mismatches;
     }
@@ -195,30 +198,37 @@ inline int score_run_defects(
       return 0;
     }
   }
-  if (mismatches <= sc.max_mimatches && bulges <= sc.max_bulges && mismatches + bulges <= sc.max_defects)
-    return (w[pi] - 1) * sc.tetrad_bonus - mismatches * sc.mismatch_penalty - bulges * sc.bulge_penalty;
-  else
-    return 0;
+  int score = 0;
+  if (mismatches <= sc.max_mimatches && bulges <= sc.max_bulges && mismatches + bulges <= sc.max_defects) {
+    score = (w[pi] - 1) * sc.tetrad_bonus - mismatches * sc.mismatch_penalty - bulges * sc.bulge_penalty;
+    f.nt = w[pi];
+    f.nb = bulges;
+    f.nm = mismatches;
+  }
+  return score;
 }
 
 /**
  * Score PQS.
  *
  * @param m Quadruples runs.
+ * @param f PQS features.
  * @param sc Scoring table.
  * @param opts Algorithm options.
  * @return Quadruplex score.
  */
 inline int score_pqs(
     run_match m[],
+    features_t &f,
     const string::const_iterator start,
     const string::const_iterator end,
     const scoring &sc, const opts_t &opts)
 {
   int w[RUN_CNT], g[RUN_CNT], l[RUN_CNT - 1];
   int l_tmp[RUN_CNT][RUN_CNT - 1];
-  int pqs_ends[RUN_CNT][2] = {0};
+  bool pqs_ends[RUN_CNT][2] = {0};
   int tmp_score[RUN_CNT];
+  features_t f_tmp[RUN_CNT];
   
   int score = 0;
 
@@ -250,13 +260,13 @@ inline int score_pqs(
   l_tmp[3][2] = l[2];
 
   tmp_score[0] = g[0] == w[0] && w[0] >= opts.run_min_len_real ?
-                  score_run_defects(0, w, g, l_tmp[0], pqs_ends[0], sc, opts) : 0;
+                  score_run_defects(0, w, g, l_tmp[0], pqs_ends[0], f_tmp[0], sc, opts) : 0;
   tmp_score[1] = g[1] == w[1] && w[1] >= opts.run_min_len_real ?
-                  score_run_defects(1, w, g, l_tmp[1], pqs_ends[1], sc, opts) : 0;
+                  score_run_defects(1, w, g, l_tmp[1], pqs_ends[1], f_tmp[1], sc, opts) : 0;
   tmp_score[2] = g[2] == w[2] && w[2] >= opts.run_min_len_real ?
-                  score_run_defects(2, w, g, l_tmp[2], pqs_ends[2], sc, opts) : 0;
+                  score_run_defects(2, w, g, l_tmp[2], pqs_ends[2], f_tmp[2], sc, opts) : 0;
   tmp_score[3] = g[3] == w[3] && w[3] >= opts.run_min_len_real ?
-                  score_run_defects(3, w, g, l_tmp[3], pqs_ends[3], sc, opts) : 0;
+                  score_run_defects(3, w, g, l_tmp[3], pqs_ends[3], f_tmp[3], sc, opts) : 0;
 
   int max_i = 0;
   max_i = tmp_score[1] > tmp_score[max_i] ? 1 : max_i;
@@ -270,12 +280,36 @@ inline int score_pqs(
   l[0] = l_tmp[max_i][0];
   l[1] = l_tmp[max_i][1];
   l[2] = l_tmp[max_i][2];
+  f = f_tmp[max_i];
   
-  m[0].first = max(m[0].first - pqs_ends[max_i][0], start);
-  m[3].second = min(m[3].second + pqs_ends[max_i][1], end);
+  if (pqs_ends[max_i][0]) {
+    // absorb mismatch in the first run
+    if (l[0] > opts.loop_min_len) {
+      ++m[0].second;
+      --l[0];
+    } else {
+      m[0].first = max(m[0].first - 1, start);
+    }
+  }
+  if (pqs_ends[max_i][1]) {
+    // absorb mismatch in the last run
+    if (l[2] > opts.loop_min_len) {
+      --m[3].first;
+      --l[2];
+    } else {
+      m[3].second = min(m[3].second + 1, end);
+    }
+  }
+  // check if pqs did not exceed the total length limit after
+  // mismatch absorbtion
   if (m[3].second - m[0].first > opts.max_len) {
     return 0;
   }
+  // update reported loop lengths
+  f.ll1 = l[0];
+  f.ll2 = l[1];
+  f.ll3 = l[2];
+  
   int mean = (l[0] + l[1] + l[2])/3;
   int d1 = (l[0] - mean)*(l[0] - mean);
   int d2 = (l[1] - mean)*(l[1] - mean);
@@ -439,7 +473,7 @@ void find_all_runs(
     string::const_iterator &pqs_start,
     pqs_storage &pqs_storage,
     pqs_cache &ctable,
-    pqs_cache::entry &pqs_cache,
+    pqs_cache::entry &cache_entry,
     int &pqs_cnt,
     results &res)
 {
@@ -454,7 +488,7 @@ void find_all_runs(
   {
     if (i == 0)
     {// specific code for the first run matching
-      if (flags.use_cache && pqs_cache.density[0] > pqs_cache::use_treshold)
+      if (flags.use_cache && cache_entry.density[0] > pqs_cache::use_treshold)
       {
         cache_hit = ctable.get(s, min(s + opts.max_len, end));
 
@@ -466,16 +500,16 @@ void find_all_runs(
           res.save_density_and_score_dist(
             s, ref, strand, cache_hit->density, cache_hit->score_dist, opts.max_len);
 
-          pqs_storage.insert_pqs(cache_hit->score, s, s + cache_hit->len, res, ref, strand);
+          pqs_storage.insert_pqs(cache_hit->score, s, s + cache_hit->len, cache_hit->f, res, ref, strand);
           continue;
         }
       }
       // reset score of best PQS starting at current position
-      pqs_cache.score = 0;
+      cache_entry.score = 0;
       // reset density and score distribution
       for (int k = 0; k < opts.max_len; ++k) {
-        pqs_cache.density[k] = 0;
-        pqs_cache.score_dist[k] = 0;
+        cache_entry.density[k] = 0;
+        cache_entry.score_dist[k] = 0;
       }
     }
     min_e = s + opts.run_min_len;
@@ -493,13 +527,13 @@ void find_all_runs(
         // enforce G4 total length limit to be relative to the first G-run start
         find_all_runs(
           subject, strand, i+1, e, min(s + opts.max_len, end), m, run_re_c,
-          opts, flags, sc, ref, len, s, pqs_storage, ctable, pqs_cache,
+          opts, flags, sc, ref, len, s, pqs_storage, ctable, cache_entry,
           pqs_cnt, res
         );
       else if (i < 3)
         find_all_runs(
           subject, strand, i+1, e, end, m, run_re_c, opts, flags, sc, ref, len,
-          pqs_start, pqs_storage, ctable, pqs_cache, pqs_cnt, res
+          pqs_start, pqs_storage, ctable, cache_entry, pqs_cnt, res
         );
       else {
         /* Check user interrupt after reasonable amount of PQS identified to react
@@ -512,8 +546,9 @@ void find_all_runs(
             Rcout << "Search status: " << ceilf((m[0].first - ref)/(double)len*100) << " %\r" << flush;
         }
         score = 0;
+        features_t pqs_features;
         if (flags.use_default_scoring) {
-          score = score_pqs(m, ref, end, sc, opts);
+          score = score_pqs(m, pqs_features, ref, end, sc, opts);
           // score = score_pqs_old(m, sc, opts);
           // score_run_content(score, m, sc);
           // score_loop_lengths(score, m, sc);
@@ -525,34 +560,35 @@ void find_all_runs(
           int pqs_len = m[3].second - m[0].first;
           
           for (int k = 0; k < pqs_len; ++k) {
-            pqs_cache.score_dist[k] = max(pqs_cache.score_dist[k], score);
+            cache_entry.score_dist[k] = max(cache_entry.score_dist[k], score);
           }
           if (score >= opts.min_score) {
             // current PQS satisfied all constraints
-            pqs_storage.insert_pqs(score, m[0].first, m[3].second, res, ref, strand);
+            pqs_storage.insert_pqs(score, m[0].first, m[3].second, pqs_features, res, ref, strand);
             
             for (int k = 0; k < pqs_len; ++k)
-              ++pqs_cache.density[k];
+              ++cache_entry.density[k];
             
-            if (score > pqs_cache.score ||
-                (score == pqs_cache.score && pqs_len < pqs_cache.len)) {
+            if (score > cache_entry.score ||
+                (score == cache_entry.score && pqs_len < cache_entry.len)) {
               // update properties of caching candidate
-              pqs_cache.score = score;
-              pqs_cache.len = pqs_len;
+              cache_entry.score = score;
+              cache_entry.len = pqs_len;
+              cache_entry.f = pqs_features;
             }
             if (flags.verbose)
-              print_pqs(m, score, ref, pqs_cache.density[0]);
+              print_pqs(m, score, ref, cache_entry.density[0]);
           }
         }
       }
     }
     if (i == 0) {
-      if (flags.use_cache && pqs_cache.density[0] > pqs_cache::use_treshold)
-        ctable.put(s, min(s + opts.max_len, end), pqs_cache);
+      if (flags.use_cache && cache_entry.density[0] > pqs_cache::use_treshold)
+        ctable.put(s, min(s + opts.max_len, end), cache_entry);
 
       // add locally accumulated density to global density array
       res.save_density_and_score_dist(
-        s, ref, strand, pqs_cache.density, pqs_cache.score_dist, opts.max_len);
+        s, ref, strand, cache_entry.density, cache_entry.score_dist, opts.max_len);
     }
   }
 }
@@ -601,7 +637,7 @@ void pqs_search(
     results &res)
 {
   run_match m[RUN_CNT];
-  pqs_cache::entry pqs_cache(opts.max_len);
+  pqs_cache::entry cache_entry(opts.max_len);
   string::const_iterator pqs_start;
   int pqs_cnt = 0;
   pqs_storage_overlapping pqs_storage_ov(seq.begin());
@@ -612,7 +648,7 @@ void pqs_search(
   find_all_runs(
     subject, strand, 0, seq.begin(), seq.end(), m, run_re_c, opts, flags, sc,
     seq.begin(), seq.length(), pqs_start, pqs_storage, ctable,
-    pqs_cache, pqs_cnt, res
+    cache_entry, pqs_cnt, res
   );
   pqs_storage.export_pqs(res, seq.begin(), strand);
 }
@@ -622,6 +658,10 @@ void pqs_search(
 //'
 //' Function for identification of all potential intramolecular quadruplex
 //' patterns (PQS) in DNA sequence.
+//' 
+//' Use \code{\link{elementMetadata}} function to get extra PQS features
+//' like number of tetrads (nt), bulges (nb), mismatches (nm) or loop lengths
+//' (ll1, ll2, ll3).
 //'
 //' @param subject DNAString object.
 //' @param strand Strand specification. Allowed values are "+", "-" or "*",
@@ -675,7 +715,9 @@ void pqs_search(
 //' @return \code{\link{PQSViews}} object
 //'
 //' @examples
-//' pv <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGGAAAA"))
+//' pv <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGTAAAA"))
+//' pv
+//' elementMetadata(pv)
 //'
 // [[Rcpp::export]]
 SEXP pqsfinder(
@@ -826,12 +868,18 @@ SEXP pqsfinder(
     ProfilerStop();
   #endif
 
-  NumericVector res_start(res.start.begin(), res.start.end());
-  NumericVector res_width(res.len.begin(), res.len.end());
-  NumericVector res_score(res.score.begin(), res.score.end());
+  IntegerVector res_start(res.start.begin(), res.start.end());
+  IntegerVector res_width(res.len.begin(), res.len.end());
+  IntegerVector res_score(res.score.begin(), res.score.end());
   CharacterVector res_strand(res.strand.begin(), res.strand.end());
+  IntegerVector res_nt(res.nt.begin(), res.nt.end());
+  IntegerVector res_nb(res.nb.begin(), res.nb.end());
+  IntegerVector res_nm(res.nm.begin(), res.nm.end());
+  IntegerVector res_ll1(res.ll1.begin(), res.ll1.end());
+  IntegerVector res_ll2(res.ll2.begin(), res.ll2.end());
+  IntegerVector res_ll3(res.ll3.begin(), res.ll3.end());
 
-  NumericVector res_density(seq.length());
+  IntegerVector res_density(seq.length());
   IntegerVector res_score_dist(seq.length());
   for (unsigned i = 0; i < seq.length(); ++i) {
     res_density[i] = res.density[i];
@@ -840,5 +888,6 @@ SEXP pqsfinder(
   Function pqsviews("PQSViews");
   return pqsviews(
     subject, res_start, res_width, res_strand, res_score,
-    res_density, res_score_dist);
+    res_density, res_score_dist,
+    res_nt, res_nb, res_nm, res_ll1, res_ll2, res_ll3);
 }

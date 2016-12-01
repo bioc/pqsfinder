@@ -5,6 +5,10 @@
 #'
 #' Function for identification of all potential intramolecular quadruplex
 #' patterns (PQS) in DNA sequence.
+#' 
+#' Use \code{\link{elementMetadata}} function to get extra PQS features
+#' like number of tetrads (nt), bulges (nb), mismatches (nm) or loop lengths
+#' (ll1, ll2, ll3).
 #'
 #' @param subject DNAString object.
 #' @param strand Strand specification. Allowed values are "+", "-" or "*",
@@ -58,7 +62,9 @@
 #' @return \code{\link{PQSViews}} object
 #'
 #' @examples
-#' pv <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGGAAAA"))
+#' pv <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGTAAAA"))
+#' pv
+#' elementMetadata(pv)
 #'
 pqsfinder <- function(subject, strand = "*", overlapping = FALSE, max_len = 50L, min_score = 42L, run_min_len = 3L, run_max_len = 11L, loop_min_len = 1L, loop_max_len = 30L, max_bulges = 3L, max_mismatches = 2L, max_defects = 3L, tetrad_bonus = 45L, bulge_penalty = 20L, mismatch_penalty = 31L, loop_mean_factor = 1, loop_mean_exponent = 1, loop_sd_factor = 1, run_re = "G{1,10}.{0,9}G{1,10}", custom_scoring_fn = NULL, use_default_scoring = TRUE, verbose = FALSE) {
     .Call('pqsfinder_pqsfinder', PACKAGE = 'pqsfinder', subject, strand, overlapping, max_len, min_score, run_min_len, run_max_len, loop_min_len, loop_max_len, max_bulges, max_mismatches, max_defects, tetrad_bonus, bulge_penalty, mismatch_penalty, loop_mean_factor, loop_mean_exponent, loop_sd_factor, run_re, custom_scoring_fn, use_default_scoring, verbose)
