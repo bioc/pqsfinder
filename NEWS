@@ -3,6 +3,9 @@ CHANGES IN VERSION 1.3.x
 
 NEW FEATURES:
 
+    o New PQS metadata reported: number of tetrads, bulges, mismatches
+      and loop lengths. To get this data, use elementMetadata accessor
+      function.
     o New algorithm option: reporting of all overlapping PQS.
     o Score distribution is reported. For each sequence position
       you get maximal score of PQS that was found overlapping
