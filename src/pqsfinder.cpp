@@ -45,6 +45,7 @@ public:
   int tetrad_bonus;
   int bulge_penalty;
   int mismatch_penalty;
+  int edge_mismatch_penalty;
   double loop_mean_factor;
   double loop_mean_exponent;
   double loop_sd_factor;
@@ -169,12 +170,12 @@ inline int score_run_defects(
     const scoring &sc,
     const opts_t &opts)
 {
-  int mismatches = 0, bulges = 0, perfects = 0;
+  int inner_mismatches = 0, edge_mismatches = 0, bulges = 0, perfects = 0;
   for (int i = 0; i < RUN_CNT; ++i) {
     if (w[i] == w[pi] && g[i] == g[pi])
       ++perfects;
     else if ((w[i] == w[pi] && g[i] == g[pi] - 1))
-      ++mismatches;
+      ++inner_mismatches;
     else if (w[i] == w[pi] - 1 && g[i] == g[pi] - 1) {
       if (i == 0) {
         pqs_ends[0] = true;
@@ -190,7 +191,7 @@ inline int score_run_defects(
       } else if (i == 3) {
         pqs_ends[1] = true;
       }
-      ++mismatches;
+      ++edge_mismatches;
     }
     else if (w[i] > w[pi] && g[i] >= g[pi])
       ++bulges;
@@ -199,8 +200,16 @@ inline int score_run_defects(
     }
   }
   int score = 0;
-  if (mismatches <= sc.max_mimatches && bulges <= sc.max_bulges && mismatches + bulges <= sc.max_defects) {
-    score = (w[pi] - 1) * sc.tetrad_bonus - mismatches * sc.mismatch_penalty - bulges * sc.bulge_penalty;
+  int mismatches = inner_mismatches + edge_mismatches;
+  
+  if (mismatches <= sc.max_mimatches &&
+      bulges <= sc.max_bulges &&
+      mismatches + bulges <= sc.max_defects)
+  {
+    score = (w[pi] - 1) * sc.tetrad_bonus
+            - inner_mismatches * sc.mismatch_penalty
+            - edge_mismatches * sc.edge_mismatch_penalty
+            - bulges * sc.bulge_penalty;
     f.nt = w[pi];
     f.nb = bulges;
     f.nm = mismatches;
@@ -681,6 +690,7 @@ void pqs_search(
 //' @param tetrad_bonus Score bonus for one complete G tetrade.
 //' @param bulge_penalty Penalization for a bulge in quadruplex run.
 //' @param mismatch_penalty Penalization for a mismatch in tetrad.
+//' @param edge_mismatch_penalty Penalization for an edge mismatch in tetrad.
 //' @param loop_mean_factor Penalization factor of loop length mean.
 //' @param loop_mean_exponent Exponent of loop length mean.
 //' @param loop_sd_factor Penalization factor of loop length standard
@@ -736,6 +746,7 @@ SEXP pqsfinder(
     int tetrad_bonus = 45,
     int bulge_penalty = 20,
     int mismatch_penalty = 31,
+    int edge_mismatch_penalty = 31,
     double loop_mean_factor = 1,
     double loop_mean_exponent = 1,
     double loop_sd_factor = 1,
@@ -816,6 +827,7 @@ SEXP pqsfinder(
   sc.tetrad_bonus = tetrad_bonus;
   sc.bulge_penalty = bulge_penalty;
   sc.mismatch_penalty = mismatch_penalty;
+  sc.edge_mismatch_penalty = edge_mismatch_penalty;
   sc.loop_mean_factor = loop_mean_factor;
   sc.loop_mean_exponent = loop_mean_exponent;
   sc.loop_sd_factor = loop_sd_factor;
