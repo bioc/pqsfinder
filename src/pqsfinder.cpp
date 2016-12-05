@@ -44,6 +44,8 @@ class scoring {
 public:
   int tetrad_bonus;
   int bulge_penalty;
+  double bulge_len_factor;
+  double bulge_len_exponent;
   int mismatch_penalty;
   int edge_mismatch_penalty;
   double loop_mean_factor;
@@ -171,12 +173,14 @@ inline int score_run_defects(
     const opts_t &opts)
 {
   int inner_mismatches = 0, edge_mismatches = 0, bulges = 0, perfects = 0;
+  int score = 0;
+  
   for (int i = 0; i < RUN_CNT; ++i) {
-    if (w[i] == w[pi] && g[i] == g[pi])
+    if (w[i] == w[pi] && g[i] == g[pi]) {
       ++perfects;
-    else if ((w[i] == w[pi] && g[i] == g[pi] - 1))
+    } else if ((w[i] == w[pi] && g[i] == g[pi] - 1)) {
       ++inner_mismatches;
-    else if (w[i] == w[pi] - 1 && g[i] == g[pi] - 1) {
+    } else if (w[i] == w[pi] - 1 && g[i] == g[pi] - 1) {
       if (i == 0) {
         pqs_ends[0] = true;
       } else if (i == 1 || i == 2) {
@@ -192,29 +196,30 @@ inline int score_run_defects(
         pqs_ends[1] = true;
       }
       ++edge_mismatches;
-    }
-    else if (w[i] > w[pi] && g[i] >= g[pi])
+    } else if (w[i] > w[pi] && g[i] >= g[pi]) {
       ++bulges;
-    else {
+      score = score - sc.bulge_len_factor * pow(w[i] - w[pi], sc.bulge_len_exponent);
+    } else {
       return 0;
     }
   }
-  int score = 0;
   int mismatches = inner_mismatches + edge_mismatches;
   
   if (mismatches <= sc.max_mimatches &&
       bulges <= sc.max_bulges &&
       mismatches + bulges <= sc.max_defects)
   {
-    score = (w[pi] - 1) * sc.tetrad_bonus
+    score = score + (w[pi] - 1) * sc.tetrad_bonus
             - inner_mismatches * sc.mismatch_penalty
             - edge_mismatches * sc.edge_mismatch_penalty
             - bulges * sc.bulge_penalty;
     f.nt = w[pi];
     f.nb = bulges;
     f.nm = mismatches;
+    return score;
+  } else {
+    return 0;
   }
-  return score;
 }
 
 /**
@@ -283,7 +288,7 @@ inline int score_pqs(
   max_i = tmp_score[3] > tmp_score[max_i] ? 3 : max_i;
 
   score = tmp_score[max_i];
-  if (score == 0) {
+  if (score <= 0) {
     return 0;
   }
   l[0] = l_tmp[max_i][0];
@@ -689,6 +694,8 @@ void pqs_search(
 //'   max_mismatches}).
 //' @param tetrad_bonus Score bonus for one complete G tetrade.
 //' @param bulge_penalty Penalization for a bulge in quadruplex run.
+//' @param bulge_len_factor Penalization factor for a bulge length.
+//' @param bulge_len_exponent Exponent of bulge length.
 //' @param mismatch_penalty Penalization for a mismatch in tetrad.
 //' @param edge_mismatch_penalty Penalization for an edge mismatch in tetrad.
 //' @param loop_mean_factor Penalization factor of loop length mean.
@@ -745,6 +752,8 @@ SEXP pqsfinder(
     int max_defects = 3,
     int tetrad_bonus = 45,
     int bulge_penalty = 20,
+    double bulge_len_factor = 1,
+    double bulge_len_exponent = 1,
     int mismatch_penalty = 31,
     int edge_mismatch_penalty = 31,
     double loop_mean_factor = 1,
@@ -826,6 +835,8 @@ SEXP pqsfinder(
   scoring sc;
   sc.tetrad_bonus = tetrad_bonus;
   sc.bulge_penalty = bulge_penalty;
+  sc.bulge_len_factor = bulge_len_factor;
+  sc.bulge_len_exponent = bulge_len_exponent;
   sc.mismatch_penalty = mismatch_penalty;
   sc.edge_mismatch_penalty = edge_mismatch_penalty;
   sc.loop_mean_factor = loop_mean_factor;
