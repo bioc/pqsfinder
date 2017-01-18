@@ -26,15 +26,12 @@
 #' @param max_defects Maximum number of defects in total (\code{max_bulges +
 #'   max_mismatches}).
 #' @param tetrad_bonus Score bonus for one complete G tetrade.
+#' @param mismatch_penalty Penalization for a mismatch in tetrad.
 #' @param bulge_penalty Penalization for a bulge in quadruplex run.
 #' @param bulge_len_factor Penalization factor for a bulge length.
 #' @param bulge_len_exponent Exponent of bulge length.
-#' @param mismatch_penalty Penalization for a mismatch in tetrad.
-#' @param edge_mismatch_penalty Penalization for an edge mismatch in tetrad.
 #' @param loop_mean_factor Penalization factor of loop length mean.
 #' @param loop_mean_exponent Exponent of loop length mean.
-#' @param loop_sd_factor Penalization factor of loop length standard
-#'   deviation.
 #' @param run_re Regular expression specifying one run of quadruplex.
 #' @param custom_scoring_fn Custom quadruplex scoring function. It takes the
 #'   following 10 arguments: \code{subject} - Input DNAString object,
@@ -69,7 +66,7 @@
 #' pv
 #' elementMetadata(pv)
 #'
-pqsfinder <- function(subject, strand = "*", overlapping = FALSE, max_len = 50L, min_score = 42L, run_min_len = 3L, run_max_len = 11L, loop_min_len = 1L, loop_max_len = 30L, max_bulges = 3L, max_mismatches = 2L, max_defects = 3L, tetrad_bonus = 45L, bulge_penalty = 20L, bulge_len_factor = 1, bulge_len_exponent = 1, mismatch_penalty = 31L, edge_mismatch_penalty = 31L, loop_mean_factor = 1, loop_mean_exponent = 1, loop_sd_factor = 1, run_re = "G{1,10}.{0,9}G{1,10}", custom_scoring_fn = NULL, use_default_scoring = TRUE, verbose = FALSE) {
-    .Call('pqsfinder_pqsfinder', PACKAGE = 'pqsfinder', subject, strand, overlapping, max_len, min_score, run_min_len, run_max_len, loop_min_len, loop_max_len, max_bulges, max_mismatches, max_defects, tetrad_bonus, bulge_penalty, bulge_len_factor, bulge_len_exponent, mismatch_penalty, edge_mismatch_penalty, loop_mean_factor, loop_mean_exponent, loop_sd_factor, run_re, custom_scoring_fn, use_default_scoring, verbose)
+pqsfinder <- function(subject, strand = "*", overlapping = FALSE, max_len = 50L, min_score = 42L, run_min_len = 2L, run_max_len = 11L, loop_min_len = 1L, loop_max_len = 30L, max_bulges = 3L, max_mismatches = 3L, max_defects = 3L, tetrad_bonus = 40L, mismatch_penalty = 26L, bulge_penalty = 21L, bulge_len_factor = 0.3, bulge_len_exponent = 1, loop_mean_factor = 3.1, loop_mean_exponent = 1.1, run_re = "G{1,10}.{0,9}G{1,10}", custom_scoring_fn = NULL, use_default_scoring = TRUE, verbose = FALSE) {
+    .Call('pqsfinder_pqsfinder', PACKAGE = 'pqsfinder', subject, strand, overlapping, max_len, min_score, run_min_len, run_max_len, loop_min_len, loop_max_len, max_bulges, max_mismatches, max_defects, tetrad_bonus, mismatch_penalty, bulge_penalty, bulge_len_factor, bulge_len_exponent, loop_mean_factor, loop_mean_exponent, run_re, custom_scoring_fn, use_default_scoring, verbose)
 }
 

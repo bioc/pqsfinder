@@ -5,14 +5,13 @@
 \title{Identificate potential quadruplex forming sequences.}
 \usage{
 pqsfinder(subject, strand = "*", overlapping = FALSE, max_len = 50L,
-  min_score = 42L, run_min_len = 3L, run_max_len = 11L,
+  min_score = 42L, run_min_len = 2L, run_max_len = 11L,
   loop_min_len = 1L, loop_max_len = 30L, max_bulges = 3L,
-  max_mismatches = 2L, max_defects = 3L, tetrad_bonus = 45L,
-  bulge_penalty = 20L, bulge_len_factor = 1, bulge_len_exponent = 1,
-  mismatch_penalty = 31L, edge_mismatch_penalty = 31L,
-  loop_mean_factor = 1, loop_mean_exponent = 1, loop_sd_factor = 1,
-  run_re = "G{1,10}.{0,9}G{1,10}", custom_scoring_fn = NULL,
-  use_default_scoring = TRUE, verbose = FALSE)
+  max_mismatches = 3L, max_defects = 3L, tetrad_bonus = 40L,
+  mismatch_penalty = 26L, bulge_penalty = 21L, bulge_len_factor = 0.3,
+  bulge_len_exponent = 1, loop_mean_factor = 3.1,
+  loop_mean_exponent = 1.1, run_re = "G{1,10}.{0,9}G{1,10}",
+  custom_scoring_fn = NULL, use_default_scoring = TRUE, verbose = FALSE)
 }
 \arguments{
 \item{subject}{DNAString object.}
@@ -44,22 +43,17 @@ max_mismatches}).}
 
 \item{tetrad_bonus}{Score bonus for one complete G tetrade.}
 
+\item{mismatch_penalty}{Penalization for a mismatch in tetrad.}
+
 \item{bulge_penalty}{Penalization for a bulge in quadruplex run.}
 
 \item{bulge_len_factor}{Penalization factor for a bulge length.}
 
 \item{bulge_len_exponent}{Exponent of bulge length.}
 
-\item{mismatch_penalty}{Penalization for a mismatch in tetrad.}
-
-\item{edge_mismatch_penalty}{Penalization for an edge mismatch in tetrad.}
-
 \item{loop_mean_factor}{Penalization factor of loop length mean.}
 
 \item{loop_mean_exponent}{Exponent of loop length mean.}
-
-\item{loop_sd_factor}{Penalization factor of loop length standard
-deviation.}
 
 \item{run_re}{Regular expression specifying one run of quadruplex.}
 
