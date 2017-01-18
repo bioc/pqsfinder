@@ -730,7 +730,7 @@ SEXP pqsfinder(
     std::string strand = "*",
     bool overlapping = false,
     int max_len = 50,
-    int min_score = 42,
+    int min_score = 27,
     int run_min_len = 2,
     int run_max_len = 11,
     int loop_min_len = 1,
