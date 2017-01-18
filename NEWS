@@ -3,6 +3,9 @@ CHANGES IN VERSION 1.3.x
 
 NEW FEATURES:
 
+    o New default values for scoring parameters as a result from
+      training on G4-seq experimental data and co-testing on a set
+      of known quadruplexes from literature.
     o New PQS metadata reported: number of tetrads, bulges, mismatches
       and loop lengths. To get this data, use elementMetadata accessor
       function.
