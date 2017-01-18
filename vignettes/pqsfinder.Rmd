@@ -45,13 +45,19 @@ pqs <- pqsfinder(seq)
 pqs
 ```
 
-Detected PQS are returned in the form of a `PQSViews` class, which represents the basic container for storing a set of views on the same input sequence based on `XStringViews` object from `r Biocpkg("Biostrings")` package. Each PQS in the view is defined by start location, width and score. All these values can be accessed by standard functions `start(x)`, `width(x)`, `strand(x)` and `score(x)` for further manipulation and analysis. For example:
+Detected PQS are returned in the form of a `PQSViews` class, which represents the basic container for storing a set of views on the same input sequence based on `XStringViews` object from `r Biocpkg("Biostrings")` package. Each PQS in the view is defined by (i) start location, (ii) width, (iii) score, (iv) strand, (v) number of G-tetrads `nt`, (vi) number of bulges `nb` and (vii) number of mismatches `nm`. The first four values can be accessed by standard functions `start(x)`, `width(x)` and `score(x)` and `strand(x)`. To get other PQS features, please use `elementMetadata(x)` function. It additionaly provides loop lengths of the detected PQS (`ll1`, `ll2`, `ll3`).
 
 ```{r accessors}
-data.frame(b = start(pqs), w = width(pqs), s = strand(pqs), sc = score(pqs))
+elementMetadata(pqs)
 ```
 
-By default, `pqsfinder` function reports only the locally best non-overlapping PQS, ignoring any other that would overlap it. However, it's possible to get numbers of all overlapping PQS at each position of the input sequence. To achieve that, call `density(x)` function on the `PQSViews` object:[^2]
+By default, `pqsfinder` function reports only the locally best non-overlapping PQS, ignoring any other that would overlap it. However, it's possible to change the default behavior by setting the `overlapping` option to `TRUE`.
+
+```{r overlapping}
+pqsfinder(seq, overlapping = TRUE)
+```
+
+Alternatively, it's possible to get numbers of all overlapping PQS at each position of the input sequence. To achieve that, call `density(x)` function on the `PQSViews` object:[^2]
 
 [^2]: Clusters of overlapping PQS usually have steep edges when the number of neighboring G-runs is low, but could be more spread out in other situations. 
 
@@ -79,6 +85,7 @@ Depending on the particular type of PQS you want to detect, the algorithm option
 Option name      | Description
 -----------------|----------------------------------------
 `strand`         | Strand specification (`+`, `-` or `*`).
+`overlapping`    | If true, than overlapping PQS will be reported.
 `max_len`        | Maximal total length of PQS.
 `min_score`      | Minimal score of PQS to be reported.
 `run_min_len`    | Minimal length of each PQS run (G-run).
@@ -102,7 +109,7 @@ pqsfinder(seq, max_defects = 0)
 **Example 2:** In case you don't mind defects in G-runs, but you want to report only higher quality PQS, increase `min_score` value:
 
 ```{r min_score, results='hold'}
-pqsfinder(seq, min_score = 80)
+pqsfinder(seq, min_score = 70)
 ```
 
 # Exporting results
@@ -168,7 +175,6 @@ In the following example, we load the human genome from the `r Biocpkg('BSgenome
 
     ```{r rwe_libraries, message=FALSE}
     library(pqsfinder)
-    library(biomaRt)
     library(BSgenome.Hsapiens.UCSC.hg38)
     library(rtracklayer)
     library(Gviz)
@@ -179,8 +185,12 @@ In the following example, we load the human genome from the `r Biocpkg('BSgenome
     ```{r rwe_biomart, warning=FALSE}
     gnm <- "hg38"
     gene <- "AHNAK"
-    mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
-    btrack <- BiomartGeneRegionTrack(biomart = mart, genome = gnm,  symbol = gene,  name = gene)
+    # Load cached biomaRt AHNAK region track:
+    load(system.file("extdata", "btrack_ahnak.RData", package="pqsfinder"))
+    # Alternatively, query biomaRt API directly with the following commands:
+    # library(biomaRt)
+    # mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+    # btrack <- BiomartGeneRegionTrack(biomart = mart, genome = gnm,  symbol = gene,  name = gene)
     ```
 
 3. Get AHNAK sequence from `r Biocpkg('BSgenome')` package extended by 1000 nucleotides on both sides.
@@ -196,7 +206,7 @@ In the following example, we load the human genome from the `r Biocpkg('BSgenome
 4. Search for PQS on both strands.
 
     ```{r rwe_pqsfinder, results='hide'}
-    pqs <- pqsfinder(seq)
+    pqs <- pqsfinder(seq, min_score = 40)
     ```
 
 5. Display the results.
@@ -218,10 +228,10 @@ In the following example, we load the human genome from the `r Biocpkg('BSgenome
     export(as(pqs, "GRanges"), "test.gff", version = "3")
     ```
 
-    The contents of the GFF3 file are as follows (the first 5 records only):
+    The contents of the GFF3 file are as follows (the first three records only):
 
     ```{r rwe_gff_file, echo=FALSE}
-    text <- readLines("test.gff", n = 7)
+    text <- readLines("test.gff", n = 5)
     cat(strwrap(text, width = 80, exdent = 3), sep= "\n")
     ```
 
@@ -231,10 +241,10 @@ In the following example, we load the human genome from the `r Biocpkg('BSgenome
     writeXStringSet(as(pqs, "DNAStringSet"), file = "test.fa", format = "fasta")
     ```
 
-    The contents of the FASTA file are as follows (the first 5 records only):
+    The contents of the FASTA file are as follows (the first three records only):
 
     ```{r rwe_fasta_file, echo=FALSE}
-    text <- readLines("test.fa", n = 10)
+    text <- readLines("test.fa", n = 6)
     cat(text, sep = "\n")
     ```
 
@@ -258,17 +268,21 @@ In the following example, we load the human genome from the `r Biocpkg('BSgenome
     suppressWarnings(plotTracks(c(btrack, strack, dtrack, atrack), type = "h"))
     ```
 
+    The stacked plot of the score and density distribution might help to assess the singularity of PQS. Higher density values indicates low-complexity regions (full of guanines), so it is expected to contain high-scoring PQS. On the other hand, a high-scoring PQS in low-density region might be an interesting target.
+    
 # Customizing the detection algorithm
 
 The underlying detection algorithm is almost fully customizable, it can even be set up to find fundamentally different types of G-quadruplexes. The very first option how to change the detection behavior is to tune scoring bonuses, penalizations and factors. Supported options are summarized in the table bellow:
 
-Option name        | Description
--------------------|--------------------------------------
-`tetrad_bonus`     | Score bonus for each G tetrade, regardless whether the tetrade contains mismatches or not.
-`bulge_penalty`    | Penalization for a run with bulge.
-`mismatch_penalty` | Penalization for a run with mismatch.
-`loop_mean_factor` | Penalization factor of loop length mean.
-`loop_sd_factor`   | Penalization factor of loop length standard deviation.
+Option name          | Description
+---------------------|--------------------------------------
+`tetrad_bonus`       | Score bonus for each G tetrade, regardless whether the tetrade contains mismatches or not.
+`mismatch_penalty`   | Penalization for a run with mismatch.
+`bulge_penalty`      | Penalization for a run with bulge.
+`bulge_len_factor`   | Penalization factor of a bulge length.
+`bulge_len_exponent` | Exponent of a bulge length.
+`loop_mean_factor`   | Penalization factor of a loop length mean.
+`loop_mean_exponent` | Exponent of a loop length mean.
 
 ## Customizing the scoring function
 
