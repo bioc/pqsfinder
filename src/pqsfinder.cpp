@@ -43,10 +43,11 @@ static const int RUN_CNT = 4;
 class scoring {
 public:
   int tetrad_bonus;
-  int mismatch_penalty;
   int bulge_penalty;
   double bulge_len_factor;
   double bulge_len_exponent;
+  int mismatch_penalty;
+  int edge_mismatch_penalty;
   double loop_mean_factor;
   double loop_mean_exponent;
   int max_bulges;
@@ -170,14 +171,14 @@ inline int score_run_defects(
     const scoring &sc,
     const opts_t &opts)
 {
-  int mismatches = 0, bulges = 0, perfects = 0;
+  int inner_mismatches = 0, edge_mismatches = 0, bulges = 0, perfects = 0;
   int score = 0;
   
   for (int i = 0; i < RUN_CNT; ++i) {
     if (w[i] == w[pi] && g[i] == g[pi]) {
       ++perfects;
     } else if ((w[i] == w[pi] && g[i] == g[pi] - 1)) {
-      ++mismatches;
+      ++inner_mismatches;
     } else if (w[i] == w[pi] - 1 && g[i] == g[pi] - 1) {
       if (i == 0) {
         pqs_ends[0] = true;
@@ -193,7 +194,7 @@ inline int score_run_defects(
       } else if (i == 3) {
         pqs_ends[1] = true;
       }
-      ++mismatches;
+      ++edge_mismatches;
     } else if (w[i] > w[pi] && g[i] >= g[pi]) {
       ++bulges;
       score = score - sc.bulge_len_factor * pow(w[i] - w[pi], sc.bulge_len_exponent);
@@ -201,12 +202,15 @@ inline int score_run_defects(
       return 0;
     }
   }
+  int mismatches = inner_mismatches + edge_mismatches;
+  
   if (mismatches <= sc.max_mimatches &&
       bulges <= sc.max_bulges &&
       mismatches + bulges <= sc.max_defects)
   {
     score = score + (w[pi] - 1) * sc.tetrad_bonus
-            - mismatches * sc.mismatch_penalty
+            - inner_mismatches * sc.mismatch_penalty
+            - edge_mismatches * sc.edge_mismatch_penalty
             - bulges * sc.bulge_penalty;
     f.nt = w[pi];
     f.nb = bulges;
@@ -685,6 +689,7 @@ void pqs_search(
 //'   max_mismatches}).
 //' @param tetrad_bonus Score bonus for one complete G tetrade.
 //' @param mismatch_penalty Penalization for a mismatch in tetrad.
+//' @param edge_mismatch_penalty Penalization for an mismatch in edge tetrad.
 //' @param bulge_penalty Penalization for a bulge in quadruplex run.
 //' @param bulge_len_factor Penalization factor for a bulge length.
 //' @param bulge_len_exponent Exponent of bulge length.
@@ -730,7 +735,7 @@ SEXP pqsfinder(
     std::string strand = "*",
     bool overlapping = false,
     int max_len = 50,
-    int min_score = 27,
+    int min_score = 23,
     int run_min_len = 2,
     int run_max_len = 11,
     int loop_min_len = 1,
@@ -739,12 +744,13 @@ SEXP pqsfinder(
     int max_mismatches = 3,
     int max_defects = 3,
     int tetrad_bonus = 40,
-    int mismatch_penalty = 26,
-    int bulge_penalty = 21,
-    double bulge_len_factor = 0.3,
-    double bulge_len_exponent = 1,
-    double loop_mean_factor = 3.1,
-    double loop_mean_exponent = 1.1,
+    int mismatch_penalty = 28,
+    int edge_mismatch_penalty = 31,
+    int bulge_penalty = 20,
+    double bulge_len_factor = 0.7,
+    double bulge_len_exponent = 0.8,
+    double loop_mean_factor = 4.5,
+    double loop_mean_exponent = 1,
     std::string run_re = "G{1,10}.{0,9}G{1,10}",
     SEXP custom_scoring_fn = R_NilValue,
     bool use_default_scoring = true,
@@ -799,6 +805,7 @@ SEXP pqsfinder(
     // User specified its own regexp, force to use regexp engine
     flags.use_re = true;
   }
+
   opts_t opts;
   opts.overlapping = overlapping;
   opts.max_len = max_len;
@@ -806,7 +813,6 @@ SEXP pqsfinder(
   opts.loop_max_len = loop_max_len;
   opts.loop_min_len = loop_min_len;
   opts.run_max_len = run_max_len;
-  
   if (run_min_len > 2 && flags.use_default_scoring) {
     opts.run_min_len = run_min_len - 1;
     opts.run_min_len_real = run_min_len;
@@ -825,6 +831,7 @@ SEXP pqsfinder(
   sc.bulge_len_factor = bulge_len_factor;
   sc.bulge_len_exponent = bulge_len_exponent;
   sc.mismatch_penalty = mismatch_penalty;
+  sc.edge_mismatch_penalty = edge_mismatch_penalty;
   sc.loop_mean_factor = loop_mean_factor;
   sc.loop_mean_exponent = loop_mean_exponent;
   sc.max_bulges = max_bulges;

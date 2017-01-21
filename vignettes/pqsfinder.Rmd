@@ -276,9 +276,10 @@ The underlying detection algorithm is almost fully customizable, it can even be 
 
 Option name          | Description
 ---------------------|--------------------------------------
-`tetrad_bonus`       | Score bonus for each G tetrade, regardless whether the tetrade contains mismatches or not.
-`mismatch_penalty`   | Penalization for a run with mismatch.
-`bulge_penalty`      | Penalization for a run with bulge.
+`tetrad_bonus`       | G-tetrad bonus, regardless the tetrade contains mismatches or not.
+`mismatch_penalty`   | Penalization for a mismatch in tetrad.
+`mismatch_penalty`   | Penalization for a mismatch in edge tetrad.
+`bulge_penalty`      | Penalization for a bulge.
 `bulge_len_factor`   | Penalization factor of a bulge length.
 `bulge_len_exponent` | Exponent of a bulge length.
 `loop_mean_factor`   | Penalization factor of a loop length mean.
