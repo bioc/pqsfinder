@@ -25,13 +25,13 @@ public:
       this->density = (int *)calloc(this->max_len, sizeof(int));
       if (this->density == NULL)
         throw runtime_error("Unable to allocate memory for cache density vector.");
-      this->score_dist = (int *)calloc(this->max_len, sizeof(int));
-      if (this->score_dist == NULL)
+      this->max_scores = (int *)calloc(this->max_len, sizeof(int));
+      if (this->max_scores == NULL)
         throw runtime_error("Unable to allocate memory for cache score distribution vector.");
     }
   public:
     int *density;
-    int *score_dist;
+    int *max_scores;
     int score;
     int len;
     features_t f;
@@ -43,13 +43,13 @@ public:
     entry(const entry &obj) : score(obj.score), len(obj.len), max_len(obj.max_len), f(obj.f) {
       init(obj.max_len);
       memcpy(this->density, obj.density, this->max_len);
-      memcpy(this->score_dist, obj.score_dist, this->max_len);
+      memcpy(this->max_scores, obj.max_scores, this->max_len);
     }
     ~entry() {
       if (this->density != NULL)
         free(this->density);
-      if (this->score_dist != NULL)
-        free(this->score_dist);
+      if (this->max_scores != NULL)
+        free(this->max_scores);
     }
   };
   typedef map<string, pqs_cache::entry> cache_map;

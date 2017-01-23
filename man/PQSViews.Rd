@@ -4,8 +4,8 @@
 \alias{PQSViews}
 \title{PQSViews class constructor}
 \usage{
-PQSViews(subject, start, width, strand, score, density, score_distribution, nt,
-  nb, nm, ll1, ll2, ll3)
+PQSViews(subject, start, width, strand, score, density, max_scores, nt, nb, nm,
+  ll1, ll2, ll3)
 }
 \arguments{
 \item{subject}{DNAString object.}
@@ -20,7 +20,7 @@ PQSViews(subject, start, width, strand, score, density, score_distribution, nt,
 
 \item{density}{Numbers of PQS overlapping at each position in \code{subject}.}
 
-\item{score_distribution}{Score of the best PQS found at each position.}
+\item{max_scores}{Score of the best PQS found at each position.}
 
 \item{nt}{Tetrad numbers.}
 
@@ -55,7 +55,7 @@ width(pv)
 strand(pv)
 score(pv)
 density(pv)
-scoreDistribution(pv)
+maxScores(pv)
 elementMetadata(pv)
 
 }

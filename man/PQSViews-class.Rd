@@ -16,6 +16,6 @@ Represents potential quadruplex forming sequences found by
 \item{\code{density}}{Numbers of PQS (potential quadruplex forming sequences)
 overlapping at each position in input sequence.}
 
-\item{\code{score_distribution}}{Score of the best PQS found at each position.}
+\item{\code{max_scores}}{Score of the best PQS found at each position.}
 }}
 

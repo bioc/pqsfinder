@@ -29,7 +29,7 @@ public:
   vector<int> ll2;
   vector<int> ll3;
   int *density;
-  int *score_dist;
+  int *max_scores;
 
   const int min_score;
   const int seq_len;
@@ -40,15 +40,15 @@ public:
     this->density = (int *)calloc(seq_len, sizeof(int));
     if (this->density == NULL)
       throw runtime_error("Unable to allocate memory for results density vector.");
-    this->score_dist = (int *)calloc(seq_len, sizeof(int));
-    if (this->score_dist == NULL)
+    this->max_scores = (int *)calloc(seq_len, sizeof(int));
+    if (this->max_scores == NULL)
       throw runtime_error("Unable to allocate memory for results score distribution vector.");
   }
   ~results() {
     if (this->density != NULL)
       free(this->density);
-    if (this->score_dist != NULL)
-      free(this->score_dist);
+    if (this->max_scores != NULL)
+      free(this->max_scores);
   }
   inline void save_pqs(
       const int score, const string::const_iterator &s,
@@ -72,9 +72,9 @@ public:
       this->ll3.push_back(f.ll3);
     }
   }
-  inline void save_density_and_score_dist(
+  inline void save_density_and_max_scores(
       const string::const_iterator &s, const string::const_iterator &ref,
-      const string &strand, const int *density, const int *score_dist, const int max_len)
+      const string &strand, const int *density, const int *max_scores, const int max_len)
   {
     int offset, k_limit;
     if (strand == "+") {
@@ -83,7 +83,7 @@ public:
       for (int k = 0; k < k_limit; ++k) {
         int i = offset + k;
         this->density[i] += density[k];
-        this->score_dist[i] = max(this->score_dist[i], score_dist[k]);
+        this->max_scores[i] = max(this->max_scores[i], max_scores[k]);
       }
     }
     else {
@@ -92,7 +92,7 @@ public:
       for (int k = 0; k < k_limit; ++k) {
         int i = offset - k;
         this->density[i] += density[k];
-        this->score_dist[i] = max(this->score_dist[i], score_dist[k]);
+        this->max_scores[i] = max(this->max_scores[i], max_scores[k]);
       }
     }
   }

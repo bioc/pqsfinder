@@ -15,20 +15,20 @@
 #'
 #' @slot density Numbers of PQS (potential quadruplex forming sequences)
 #'               overlapping at each position in input sequence.
-#' @slot score_distribution Score of the best PQS found at each position.
+#' @slot max_scores Score of the best PQS found at each position.
 #'
 .PQSViews <- setClass(
   "PQSViews",
   contains = "XStringViews",
   slots = c(
     density = "integer",
-    score_distribution = "integer"
+    max_scores = "integer"
   ),
   validity = function(object) {
     if (length(object@subject) != length(object@density)) {
       return("Length of the density vector is not equal to the length of the subject.")
     }
-    if (length(object@subject) != length(object@score_distribution)) {
+    if (length(object@subject) != length(object@max_scores)) {
       return("Length of the score distribution vector is not equal to the length of the subject.")
     }
     return(TRUE)
@@ -52,7 +52,7 @@
 #' @param strand Strand specifications.
 #' @param score Scores.
 #' @param density Numbers of PQS overlapping at each position in \code{subject}.
-#' @param score_distribution Score of the best PQS found at each position.
+#' @param max_scores Score of the best PQS found at each position.
 #' @param nt Tetrad numbers.
 #' @param nb Bulge counts.
 #' @param nm Mismatch counts.
@@ -69,11 +69,11 @@
 #' strand(pv)
 #' score(pv)
 #' density(pv)
-#' scoreDistribution(pv)
+#' maxScores(pv)
 #' elementMetadata(pv)
 #'
 PQSViews <- function(
-  subject, start, width, strand, score, density, score_distribution,
+  subject, start, width, strand, score, density, max_scores,
   nt, nb, nm, ll1, ll2, ll3)
 {
   ix <- order(start)
@@ -84,7 +84,7 @@ PQSViews <- function(
       nb = nb[ix], nm = nm[ix], ll1 = ll1[ix],
       ll2 = ll2[ix], ll3 = ll3[ix]
     ),
-    density = density, score_distribution = score_distribution
+    density = density, max_scores = max_scores
   )
 }
 
@@ -122,32 +122,32 @@ setMethod("strand", "PQSViews", function(x) mcols(x)$strand)
 #'
 setMethod("density", "PQSViews", function(x) x@density)
 
-#' Get score distribution vector
+#' Get vector of maximal scores
 #' 
-#' Get score distribution vector of given object.
+#' Get vector of maximal scores for a given object.
 #' 
 #' @param x An object.
 #' @param ... Additional arguments, for use in specific methods.
-#' @return Score distribution vector.
+#' @return Vector of maximal scores.
 #' @examples
-#' showMethods("scoreDistribution")
+#' showMethods("maxScores")
 #' 
-setGeneric("scoreDistribution", function(x, ...) {
-  standardGeneric("scoreDistribution")
+setGeneric("maxScores", function(x, ...) {
+  standardGeneric("maxScores")
 })
 
-#' Get score distribution vector
+#' Get vector of maximal scores
 #'
-#' Score distribution vector represents score of the best PQS found
-#' at each sequence position.
+#' For each sequence position it gives the maximal score
+#' of all PQS conformations which overlap that position.
 #' 
 #' @param x PQSViews object.
-#' @return Score distribution vector.
+#' @return Vector of maximal scores.
 #' @examples
 #' pqs <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGGAAAA"))
-#' scoreDistribution(pqs)
+#' maxScores(pqs)
 #'
-setMethod('scoreDistribution', 'PQSViews', function(x) x@score_distribution)
+setMethod('maxScores', 'PQSViews', function(x) x@max_scores)
 
 ## The 2 helper functions below convert a given view on an XString object
 ## into a character-string.

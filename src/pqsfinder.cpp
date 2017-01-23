@@ -506,8 +506,8 @@ void find_all_runs(
             Rcout << "Cache hit: " << s - ref  << " " << string(s, s+cache_hit->len)
                   << " " << cache_hit->score << endl;
 
-          res.save_density_and_score_dist(
-            s, ref, strand, cache_hit->density, cache_hit->score_dist, opts.max_len);
+          res.save_density_and_max_scores(
+            s, ref, strand, cache_hit->density, cache_hit->max_scores, opts.max_len);
 
           pqs_storage.insert_pqs(cache_hit->score, s, s + cache_hit->len, cache_hit->f, res, ref, strand);
           continue;
@@ -518,7 +518,7 @@ void find_all_runs(
       // reset density and score distribution
       for (int k = 0; k < opts.max_len; ++k) {
         cache_entry.density[k] = 0;
-        cache_entry.score_dist[k] = 0;
+        cache_entry.max_scores[k] = 0;
       }
     }
     min_e = s + opts.run_min_len;
@@ -569,7 +569,7 @@ void find_all_runs(
           int pqs_len = m[3].second - m[0].first;
           
           for (int k = 0; k < pqs_len; ++k) {
-            cache_entry.score_dist[k] = max(cache_entry.score_dist[k], score);
+            cache_entry.max_scores[k] = max(cache_entry.max_scores[k], score);
           }
           if (score >= opts.min_score) {
             // current PQS satisfied all constraints
@@ -596,8 +596,8 @@ void find_all_runs(
         ctable.put(s, min(s + opts.max_len, end), cache_entry);
 
       // add locally accumulated density to global density array
-      res.save_density_and_score_dist(
-        s, ref, strand, cache_entry.density, cache_entry.score_dist, opts.max_len);
+      res.save_density_and_max_scores(
+        s, ref, strand, cache_entry.density, cache_entry.max_scores, opts.max_len);
     }
   }
 }
@@ -895,14 +895,14 @@ SEXP pqsfinder(
   IntegerVector res_ll3(res.ll3.begin(), res.ll3.end());
 
   IntegerVector res_density(seq.length());
-  IntegerVector res_score_dist(seq.length());
+  IntegerVector res_max_scores(seq.length());
   for (unsigned i = 0; i < seq.length(); ++i) {
     res_density[i] = res.density[i];
-    res_score_dist[i] = res.score_dist[i];
+    res_max_scores[i] = res.max_scores[i];
   }
   Function pqsviews("PQSViews");
   return pqsviews(
     subject, res_start, res_width, res_strand, res_score,
-    res_density, res_score_dist,
+    res_density, res_max_scores,
     res_nt, res_nb, res_nm, res_ll1, res_ll2, res_ll3);
 }
