@@ -751,7 +751,7 @@ SEXP pqsfinder(
     double bulge_len_exponent = 0.8,
     double loop_mean_factor = 4.5,
     double loop_mean_exponent = 1,
-    std::string run_re = "G{1,10}.{0,9}G{1,10}",
+    std::string run_re = ".?G{1,10}.{0,9}G{1,10}.?",
     SEXP custom_scoring_fn = R_NilValue,
     bool use_default_scoring = true,
     bool verbose = false)
@@ -801,7 +801,7 @@ SEXP pqsfinder(
   flags.verbose = verbose;
   flags.use_default_scoring = use_default_scoring;
 
-  if (run_re != "G{1,10}.{0,9}G{1,10}") {
+  if (run_re != ".?G{1,10}.{0,9}G{1,10}.?") {
     // User specified its own regexp, force to use regexp engine
     flags.use_re = true;
   }
@@ -813,7 +813,7 @@ SEXP pqsfinder(
   opts.loop_max_len = loop_max_len;
   opts.loop_min_len = loop_min_len;
   opts.run_max_len = run_max_len;
-  if (run_min_len > 2 && flags.use_default_scoring) {
+  if (run_min_len > 2 && flags.use_default_scoring && !flags.use_re) {
     opts.run_min_len = run_min_len - 1;
     opts.run_min_len_real = run_min_len;
   } else {
