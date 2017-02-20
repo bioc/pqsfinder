@@ -371,7 +371,9 @@ setAs("PQSViews", "GRanges", function(from)
     nm = .get_nm(from),
     ll1 = .get_ll1(from),
     ll2 = .get_ll2(from),
-    ll3 = .get_ll3(from)
+    ll3 = .get_ll3(from),
+    source = "pqsfinder",
+    type = "G_quartet"
   )
 })
 
