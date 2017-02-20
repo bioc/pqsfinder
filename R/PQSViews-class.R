@@ -335,6 +335,7 @@ setAs("PQSViews", "DNAStringSet", function(from)
   for (i in 1:length(s))
   {# Set proper names
     names(s)[i] <- paste(
+      "pqsfinder;G_quartet;",
       "start=", start(from)[i], ";",
       "end=", end(from)[i], ";",
       "strand=", strand(from)[i], ";",
