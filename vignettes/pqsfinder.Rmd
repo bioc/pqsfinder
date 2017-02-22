@@ -136,8 +136,8 @@ export(gr, "test.gff", version = "3")
 
 Please note, that it is necessary to load the `rtracklayer` library before running the `export` command. The contents of the resulting GFF3 file are:
 
-```{r gff_file}
-text <- readLines("test.gff", n = 10)
+```{r gff_file, echo=FALSE, comment=NA}
+text <- readLines("test.gff")
 cat(strwrap(text, width = 80, exdent = 3), sep = "\n")
 ```
 
@@ -160,8 +160,8 @@ writeXStringSet(dss, file = "test.fa", format = "fasta")
 
 The contents of the resulting FASTA file are:
 
-```{r fasta_file}
-text <- readLines("test.fa", n = 10)
+```{r fasta_file, echo=FALSE, comment=NA}
+text <- readLines("test.fa")
 cat(text, sep = "\n")
 ```
 
@@ -230,7 +230,7 @@ In the following example, we load the human genome from the `r Biocpkg('BSgenome
 
     The contents of the GFF3 file are as follows (the first three records only):
 
-    ```{r rwe_gff_file, echo=FALSE}
+    ```{r rwe_gff_file, echo=FALSE, comment=NA}
     text <- readLines("test.gff", n = 5)
     cat(strwrap(text, width = 80, exdent = 3), sep= "\n")
     ```
@@ -243,7 +243,7 @@ In the following example, we load the human genome from the `r Biocpkg('BSgenome
 
     The contents of the FASTA file are as follows (the first three records only):
 
-    ```{r rwe_fasta_file, echo=FALSE}
+    ```{r rwe_fasta_file, echo=FALSE, comment=NA}
     text <- readLines("test.fa", n = 6)
     cat(text, sep = "\n")
     ```
