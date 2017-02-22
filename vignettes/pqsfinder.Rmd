@@ -177,6 +177,7 @@ In the following example, we load the human genome from the `r Biocpkg('BSgenome
     library(pqsfinder)
     library(BSgenome.Hsapiens.UCSC.hg38)
     library(rtracklayer)
+    library(ggplot2)
     library(Gviz)
     ```
 
@@ -251,7 +252,7 @@ In the following example, we load the human genome from the `r Biocpkg('BSgenome
 9. Show histogram for score distribution of detected PQS.
 
     ```{r rwe_hist, fig.height=4, fig.width=6}
-    hist(score(pqs), breaks = 20, main = "Histogram of PQS score")
+    qplot(score(pqs), geom = "histogram", main = "Histogram of PQS score", bins = 25)
     ```
 
 10. Show PQS score and density distribution along AHNAK gene annotation using `r Biocpkg('Gviz')` package.
