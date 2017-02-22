@@ -278,7 +278,7 @@ Option name          | Description
 ---------------------|--------------------------------------
 `tetrad_bonus`       | G-tetrad bonus, regardless the tetrade contains mismatches or not.
 `mismatch_penalty`   | Penalization for a mismatch in tetrad.
-`mismatch_penalty`   | Penalization for a mismatch in edge tetrad.
+`edge_mismatch_penalty`   | Penalization for a mismatch in edge tetrad.
 `bulge_penalty`      | Penalization for a bulge.
 `bulge_len_factor`   | Penalization factor of a bulge length.
 `bulge_len_exponent` | Exponent of a bulge length.
