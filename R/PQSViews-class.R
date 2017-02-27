@@ -358,11 +358,14 @@ setAs("PQSViews", "DNAStringSet", function(from)
 ##
 setAs("PQSViews", "GRanges", function(from)
 {
+  source <- rep("pqsfinder", length(from))
+  type <- rep("G_quartet", length(from))
+  seqnames <- rep("chr1", length(from))
   seqlen <- length(subject(from))
   names(seqlen) <- "chr1"
-
+  
   GRanges(
-    "chr1",
+    seqnames,
     IRanges(start(from), end(from)),
     strand(from),
     score = score(from),
@@ -373,8 +376,8 @@ setAs("PQSViews", "GRanges", function(from)
     ll1 = .get_ll1(from),
     ll2 = .get_ll2(from),
     ll3 = .get_ll3(from),
-    source = "pqsfinder",
-    type = "G_quartet"
+    source = source,
+    type = type
   )
 })
 
