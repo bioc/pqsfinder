@@ -16,4 +16,3 @@ Character vector representing PQS.
 \description{
 Coerce to character vector
 }
-

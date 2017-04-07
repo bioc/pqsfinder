@@ -22,4 +22,3 @@ pqs <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGGAAAA"))
 maxScores(pqs)
 
 }
-

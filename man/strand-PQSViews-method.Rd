@@ -21,4 +21,3 @@ pqs <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGGAAAA"))
 strand(pqs)
 
 }
-

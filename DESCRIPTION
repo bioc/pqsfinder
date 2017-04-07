@@ -24,5 +24,5 @@ Suggests: BiocStyle, knitr, Gviz, rtracklayer, ggplot2,
 LinkingTo: Rcpp, BH (>= 1.62.0)
 SystemRequirements: GNU make, C++11
 VignetteBuilder: knitr
-RoxygenNote: 5.0.1
+RoxygenNote: 6.0.1
 NeedsCompilation: yes

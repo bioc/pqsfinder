@@ -16,4 +16,3 @@ PQSViews object printed.
 \description{
 Show method
 }
-

@@ -17,7 +17,7 @@ output:
 
 # Introduction
 
-The main functionality of the `r Biocpkg("pqsfinder")` package is to detect DNA sequence patterns that are likely to fold into an intramolecular G-quadruplex (G4). G4 is a DNA structure that can form as an alternative to the canonical B-DNA. G4s are believed to be involved in regulation of diverse biological processes, such as telomere maintenance, DNA replication, chromatin formation, transcription, recombination or mutation [@maizels_2014; @kejnovsky_etal_2015]. The main idea of our algorithmic approach is based on the fact that G4 structures arise from compact sequence motifs composed of four consecutive and possibly imperfect guanine runs (G-run) interrupted by loops of semi-arbitrary lengths. The algorithm first identifies four consecutive G-run sequences. Subsequently, it examines the potential of such G-runs to form a stable G4 and assigns a corresponding quatitative score to each. Non-overlapping potential quadruplex-forming sequences (PQS) with positive score are then reported.
+The main functionality of the `r Biocpkg("pqsfinder")` package is to detect DNA sequence patterns that are likely to fold into an intramolecular G-quadruplex (G4). G4 is a DNA structure that can form as an alternative to the canonical B-DNA. G4s are believed to be involved in regulation of diverse biological processes, such as telomere maintenance, DNA replication, chromatin formation, transcription, recombination or mutation [@maizels_2014; @kejnovsky_etal_2015]. The main idea of our algorithmic approach is based on the fact that G4 structures arise from compact sequence motifs composed of four consecutive and possibly imperfect guanine runs (G-run) interrupted by loops of semi-arbitrary lengths. The algorithm first identifies four consecutive G-run sequences. Subsequently, it examines the potential of such G-runs to form a stable G4 and assigns a corresponding quantitative score to each. Non-overlapping potential quadruplex-forming sequences (PQS) with positive score are then reported.
 
 It is important to note that unlike many other approaches, our algorithm is able to detect sequences responsible for G4s folded from imperfect G-runs containing bulges or mismatches and as such is more sensitive than competing algorithms [^1]. We also believe the presented solution is the most scalable, since it can be easily and quickly customized (see chapter [Customizing detection algorithm](#customizing-detection-algorithm) for details). The program can be made to detect novel or experimental G4 types that might be discovered or studied in future.
 
@@ -181,26 +181,25 @@ In the following example, we load the human genome from the `r Biocpkg('BSgenome
     library(Gviz)
     ```
 
-2. Retrive AHNAK gene Biomart annotation.
+2. Retrive AHNAK gene annotation.
 
     ```{r rwe_biomart, warning=FALSE}
     gnm <- "hg38"
     gene <- "AHNAK"
-    # Load cached biomaRt AHNAK region track:
-    load(system.file("extdata", "btrack_ahnak.RData", package="pqsfinder"))
-    # Alternatively, query biomaRt API directly with the following commands:
+    # Load cached AHNAK region track:
+    load(system.file("extdata", "gtrack_ahnak.RData", package="pqsfinder"))
+    # Alternatively, query biomaRt API with the following commands:
     # library(biomaRt)
-    # mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
-    # btrack <- BiomartGeneRegionTrack(biomart = mart, genome = gnm,  symbol = gene,  name = gene)
+    # gtrack <- BiomartGeneRegionTrack(genome = gnm, symbol = gene, name = gene)
     ```
 
 3. Get AHNAK sequence from `r Biocpkg('BSgenome')` package extended by 1000 nucleotides on both sides.
 
     ```{r rwe_seq}
     extend <- 1000
-    seq_start <- min(start(btrack)) - extend
-    seq_end <- max(end(btrack)) + extend
-    chr <- chromosome(btrack)
+    seq_start <- min(start(gtrack)) - extend
+    seq_end <- max(end(gtrack)) + extend
+    chr <- chromosome(gtrack)
     seq <- Hsapiens[[chr]][seq_start:seq_end]
     ```
 
@@ -266,7 +265,7 @@ In the following example, we load the human genome from the `r Biocpkg('BSgenome
       data = density(pqs), chromosome = chr, genome = gnm,
       name = "density")
     atrack <- GenomeAxisTrack()
-    suppressWarnings(plotTracks(c(btrack, strack, dtrack, atrack), type = "h"))
+    suppressWarnings(plotTracks(c(gtrack, strack, dtrack, atrack), type = "h"))
     ```
 
     The stacked plot of the score and density distribution might help to assess the singularity of PQS. Higher density values indicates low-complexity regions (full of guanines), so it is expected to contain high-scoring PQS. On the other hand, a high-scoring PQS in low-density region might be an interesting target.

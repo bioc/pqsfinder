@@ -2,8 +2,8 @@
 % Please edit documentation in R/PQSViews-class.R
 \docType{class}
 \name{PQSViews-class}
-\alias{.PQSViews}
 \alias{PQSViews-class}
+\alias{.PQSViews}
 \title{An S4 class to represent potential quadruplex forming sequences}
 \description{
 Represents potential quadruplex forming sequences found by

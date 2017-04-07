@@ -21,4 +21,3 @@ Get vector of maximal scores for a given object.
 showMethods("maxScores")
 
 }
-

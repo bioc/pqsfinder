@@ -493,7 +493,7 @@ void find_all_runs(
   if (i > 0 && start - m[i-1].second < opts.loop_min_len)
     start = min(m[i-1].second + opts.loop_min_len, end); // skip too short loop
 
-  for (s = start; s < end; s++)
+  for (s = start; s < end; ++s)
   {
     if (i == 0)
     {// specific code for the first run matching
