@@ -19,6 +19,8 @@ NEW FEATURES:
 
 BUG FIXES
 
+    o Minimal loop length is set back to 0 by default, but only
+      one zero-length loop is allowed by the scoring system.
     o Fixed unintentional cast of loop length mean factor and loop
       standard deviation factors from float to integer.
 
@@ -27,7 +29,7 @@ CHANGES IN VERSION 1.2.x
 
 BUG FIXES
 
-    o Min loop length is now set to 1 by default.
+    o Minimal loop length is now set to 1 by default.
     o Removed linking dependency on the flowCore package.
     o Fixed bug responsible for a segmentation fault. Great credit
       belongs to Diego Andino for sending a bug report.
