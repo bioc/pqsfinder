@@ -9,8 +9,10 @@
 #include <Rcpp.h>
 #include <string>
 #include <cstring>
+#include <cstdio>
 #include <cstdlib>
 #include <algorithm>
+#include <chrono>
 #include <boost/regex.hpp>
 #ifdef _GLIBCXX_DEBUG
 #include <google/profiler.h>
@@ -503,7 +505,8 @@ void find_all_runs(
     pqs_cache::entry &cache_entry,
     int &pqs_cnt,
     results &res,
-    bool zero_loop)
+    bool zero_loop,
+    chrono::system_clock::time_point s_time)
 {
   string::const_iterator s, e, min_e;
   int score, loop_len;
@@ -566,12 +569,12 @@ void find_all_runs(
         find_all_runs(
           subject, strand, i+1, e, min(s + opts.max_len, end), m, run_re_c,
           opts, flags, sc, ref, len, s, pqs_storage, ctable, cache_entry,
-          pqs_cnt, res, zero_loop
+          pqs_cnt, res, zero_loop, s_time
         );
       else if (i < 3)
         find_all_runs(
           subject, strand, i+1, e, end, m, run_re_c, opts, flags, sc, ref, len,
-          pqs_start, pqs_storage, ctable, cache_entry, pqs_cnt, res, zero_loop
+          pqs_start, pqs_storage, ctable, cache_entry, pqs_cnt, res, zero_loop, s_time
         );
       else {
         /* Check user interrupt after reasonable amount of PQS identified to react
@@ -580,8 +583,21 @@ void find_all_runs(
         {
           pqs_cnt = 0;
           checkUserInterrupt();
-          if (!flags.verbose)
-            Rcout << "Search status: " << ceilf((m[0].first - ref)/(double)len*100) << " %\r" << flush;
+          if (!flags.verbose) {
+            double percents = ceilf((m[0].first - ref)/(double)len*100);
+            double e_seconds = chrono::duration_cast<std::chrono::seconds>(
+              chrono::system_clock::now() - s_time).count();
+            double r_seconds = (e_seconds / percents) * (100 - percents);
+            int r_hours = r_seconds / 3600;
+            r_seconds -= r_hours * 3600;
+            int r_minutes = r_seconds / 60;
+            r_seconds -= r_minutes * 60;
+            
+            char buffer[10];
+            sprintf(buffer, "%02d:%02d:%02d", r_hours, r_minutes, (int) r_seconds);
+            
+            Rcout << "Search status: " << percents << "% ETTC " << string(buffer) << "\r" << flush;
+          }
         }
         score = 0;
         features_t pqs_features;
@@ -686,7 +702,7 @@ void pqs_search(
   find_all_runs(
     subject, strand, 0, seq.begin(), seq.end(), m, run_re_c, opts, flags, sc,
     seq.begin(), seq.length(), pqs_start, pqs_storage, ctable,
-    cache_entry, pqs_cnt, res, 0
+    cache_entry, pqs_cnt, res, 0, chrono::system_clock::now()
   );
   pqs_storage.export_pqs(res, seq.begin(), strand);
 }
@@ -853,7 +869,7 @@ SEXP pqsfinder(
   if (flags.use_re) {
     opts.check_int_period = 1e6;
   } else {
-    opts.check_int_period = 2e7;
+    opts.check_int_period = 1e7;
   }
   scoring sc;
   sc.tetrad_bonus = tetrad_bonus;
