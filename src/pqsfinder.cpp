@@ -318,6 +318,13 @@ inline int score_pqs(
   if (m[3].second - m[0].first > opts.max_len) {
     return 0;
   }
+  // check if no more than one loop has zero length
+  if (opts.loop_min_len == 0 &&
+       ( (l[0] == 0 && l[1] == 0) ||
+         (l[0] == 0 && l[2] == 0) ||
+         (l[1] == 0 && l[2] == 0) ) ) {
+    return 0;
+  }
   // update reported loop lengths
   f.ll1 = l[0];
   f.ll2 = l[1];
@@ -465,6 +472,17 @@ inline bool find_run(
  * @param end Limit end position for the current run
  * @param m Array of run matches
  * @param run_re_c Compiled run regular expression
+ * @param opts Algorithm options
+ * @param sc Scoring options
+ * @param ref Reference point, typically start of sequence
+ * @param len Total sequence length
+ * @param pqs_start Start of the first G-run
+ * @param pqs_storage Storage object
+ * @param ctable Cache table
+ * @param cache_entry Candidate cache entry
+ * @param pqs_cnt PQS counter
+ * @param res Object for output PQS
+ * @param zero_loop Flag, if PQS has zero-length loop
  */
 void find_all_runs(
     SEXP subject,
@@ -484,15 +502,22 @@ void find_all_runs(
     pqs_cache &ctable,
     pqs_cache::entry &cache_entry,
     int &pqs_cnt,
-    results &res)
+    results &res,
+    bool zero_loop)
 {
   string::const_iterator s, e, min_e;
-  int score;
+  int score, loop_len;
   pqs_cache::entry *cache_hit;
-
-  if (i > 0 && start - m[i-1].second < opts.loop_min_len)
-    start = min(m[i-1].second + opts.loop_min_len, end); // skip too short loop
-
+  
+  if (i > 0) {
+    loop_len = start - m[i-1].second; 
+    if (loop_len < opts.loop_min_len) {
+      start = min(m[i-1].second + opts.loop_min_len, end); // skip too short loop
+    } else if (flags.use_default_scoring && loop_len == 0 && zero_loop) {
+      start = min(m[i-1].second + 1, end); // only one zero-length loop is allowed
+    }
+  }
+  
   for (s = start; s < end; ++s)
   {
     if (i == 0)
@@ -528,8 +553,12 @@ void find_all_runs(
       // update search bounds
       s = m[i].first;
       e = m[i].second;
-
-      if (i > 0 && s - m[i-1].second > opts.loop_max_len)
+      
+      loop_len = s - m[i-1].second;
+      if (loop_len == 0) {
+        zero_loop = true;
+      }
+      if (i > 0 && loop_len > opts.loop_max_len)
         return; // skip too long loops
 
       if (i == 0)
@@ -537,12 +566,12 @@ void find_all_runs(
         find_all_runs(
           subject, strand, i+1, e, min(s + opts.max_len, end), m, run_re_c,
           opts, flags, sc, ref, len, s, pqs_storage, ctable, cache_entry,
-          pqs_cnt, res
+          pqs_cnt, res, zero_loop
         );
       else if (i < 3)
         find_all_runs(
           subject, strand, i+1, e, end, m, run_re_c, opts, flags, sc, ref, len,
-          pqs_start, pqs_storage, ctable, cache_entry, pqs_cnt, res
+          pqs_start, pqs_storage, ctable, cache_entry, pqs_cnt, res, zero_loop
         );
       else {
         /* Check user interrupt after reasonable amount of PQS identified to react
@@ -657,7 +686,7 @@ void pqs_search(
   find_all_runs(
     subject, strand, 0, seq.begin(), seq.end(), m, run_re_c, opts, flags, sc,
     seq.begin(), seq.length(), pqs_start, pqs_storage, ctable,
-    cache_entry, pqs_cnt, res
+    cache_entry, pqs_cnt, res, 0
   );
   pqs_storage.export_pqs(res, seq.begin(), strand);
 }
@@ -681,7 +710,8 @@ void pqs_search(
 //' @param min_score Minimal PQS score.
 //' @param run_min_len Minimal length of quadruplex run.
 //' @param run_max_len Maximal length of quadruplex run.
-//' @param loop_min_len Minimal length of quadruplex loop.
+//' @param loop_min_len Minimal length of quadruplex loop. Unless the default scoring
+//' system is disabled, at most one loop can have zero length.
 //' @param loop_max_len Maxmimal length of quadruplex loop.
 //' @param max_bulges Maximal number of runs with bulge.
 //' @param max_mismatches Maximal number of runs with mismatch.
@@ -735,10 +765,10 @@ SEXP pqsfinder(
     std::string strand = "*",
     bool overlapping = false,
     int max_len = 50,
-    int min_score = 23,
+    int min_score = 26,
     int run_min_len = 2,
     int run_max_len = 11,
-    int loop_min_len = 1,
+    int loop_min_len = 0,
     int loop_max_len = 30,
     int max_bulges = 3,
     int max_mismatches = 3,
