@@ -111,7 +111,7 @@ public:
  */
 inline void print_pqs(const run_match m[], int score, const string::const_iterator ref, const int cnt)
 {
-  Rcout << m[0].first - ref + 1 << " " << cnt << " "  << "[" << string(m[0].first, m[0].second) << "]";
+  Rcout << m[0].first - ref + 1 << " " << m[3].second - m[0].first << " " << cnt << " "  << "[" << string(m[0].first, m[0].second) << "]";
   for (int i = 1; i < RUN_CNT; i++)
     Rcout << string(m[i-1].second, m[i].first) << "[" << string(m[i].first, m[i].second) << "]";
   Rcout << " " << score << endl;
@@ -300,26 +300,26 @@ inline int score_pqs(
   if (pqs_ends[max_i][0]) {
     // absorb mismatch in the first run
     if (l[0] > opts.loop_min_len) {
-      ++m[0].second;
+      // ++m[0].second;
       --l[0];
     } else {
-      m[0].first = max(m[0].first - 1, start);
+      // m[0].first = max(m[0].first - 1, start);
     }
   }
   if (pqs_ends[max_i][1]) {
     // absorb mismatch in the last run
     if (l[2] > opts.loop_min_len) {
-      --m[3].first;
+      // --m[3].first;
       --l[2];
     } else {
-      m[3].second = min(m[3].second + 1, end);
+      // m[3].second = min(m[3].second + 1, end);
     }
   }
   /* check if pqs did not exceed the total length limit after
      mismatch absorbtion */
-  if (m[3].second - m[0].first > opts.max_len) {
-    return 0;
-  }
+  // if (m[3].second - m[0].first > opts.max_len) {
+  //   return 0;
+  // }
   // check if no more than one loop has zero length
   if (opts.loop_min_len == 0 &&
        ( (l[0] == 0 && l[1] == 0) ||
@@ -463,6 +463,21 @@ inline bool find_run(
   }
 }
 
+void debug_s_e(
+    const char *name,
+    int i,
+    string::const_iterator &s,
+    string::const_iterator &e,
+    const string::const_iterator &ref) {
+  
+  // int s_i = s - ref + 1;
+  // int e_i = e - ref;
+  // 
+  // if (s_i == 6 || s_i == 7) {
+  //   Rprintf("[%d] %s: %d %d\n", i, name, s_i, e_i);
+  // }
+}
+
 
 /**
  * Recursively idetify 4 consecutive runs making quadruplex
@@ -553,9 +568,13 @@ void find_all_runs(
 
     for (e = end; e >= min_e && find_run(s, e, m[i], run_re_c, opts, flags); e--)
     {
+      debug_s_e("A", i, s, e, ref);
+      
       // update search bounds
-      s = m[i].first;
-      e = m[i].second;
+      s = string::const_iterator(m[i].first);
+      e = string::const_iterator(m[i].second);
+      
+      debug_s_e("B", i, s, e, ref);
       
       loop_len = s - m[i-1].second;
       if (loop_len == 0) {
@@ -607,6 +626,7 @@ void find_all_runs(
           // score_run_content(score, m, sc);
           // score_loop_lengths(score, m, sc);
         }
+        debug_s_e("C", i, s, e, ref);
         if ((score || !flags.use_default_scoring) && sc.custom_scoring_fn != NULL) {
           check_custom_scoring_fn(score, m, sc, subject, ref);
         }
@@ -635,6 +655,7 @@ void find_all_runs(
           }
         }
       }
+      debug_s_e("D", i, s, e, ref);
     }
     if (i == 0) {
       if (flags.use_cache && cache_entry.density[0] > pqs_cache::use_treshold)
