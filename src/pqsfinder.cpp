@@ -8,6 +8,7 @@
 
 #include <Rcpp.h>
 #include <string>
+#include <climits>
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
@@ -217,10 +218,7 @@ inline int score_pqs(
     const scoring &sc, const opts_t &opts)
 {
   int w[RUN_CNT], g[RUN_CNT], l[RUN_CNT - 1];
-  int tmp_score[RUN_CNT];
-  features_t f_tmp[RUN_CNT];
-  
-  int score = 0;
+  int min_pw, pi, score, mean, d1, d2, d3;
   
   l[0] = m[1].first - m[0].second;
   l[1] = m[2].first - m[1].second;
@@ -243,36 +241,32 @@ inline int score_pqs(
   g[1] = count_g_num(m[1]);
   g[2] = count_g_num(m[2]);
   g[3] = count_g_num(m[3]);
+  
+  min_pw = INT_MAX;
+  pi = -1;
+  for (int i = 0; i < RUN_CNT; ++i) {
+    if (w[i] < min_pw && g[i] == w[i]) {
+      min_pw = w[i];
+      pi = i;
+    }
+  }
+  if (pi < 0) {
+    return 0;
+  }
 
-  tmp_score[0] = g[0] == w[0] && w[0] >= opts.run_min_len ?
-                  score_run_defects(0, w, g, f_tmp[0], sc, opts) : 0;
-  tmp_score[1] = g[1] == w[1] && w[1] >= opts.run_min_len ?
-                  score_run_defects(1, w, g, f_tmp[1], sc, opts) : 0;
-  tmp_score[2] = g[2] == w[2] && w[2] >= opts.run_min_len ?
-                  score_run_defects(2, w, g, f_tmp[2], sc, opts) : 0;
-  tmp_score[3] = g[3] == w[3] && w[3] >= opts.run_min_len ?
-                  score_run_defects(3, w, g, f_tmp[3], sc, opts) : 0;
-
-  int max_i = 0;
-  max_i = tmp_score[1] > tmp_score[max_i] ? 1 : max_i;
-  max_i = tmp_score[2] > tmp_score[max_i] ? 2 : max_i;
-  max_i = tmp_score[3] > tmp_score[max_i] ? 3 : max_i;
-
-  score = tmp_score[max_i];
+  score = score_run_defects(pi, w, g, f, sc, opts);
   if (score <= 0) {
     return 0;
   }
-  f = f_tmp[max_i];
-  
   // update reported loop lengths
   f.ll1 = l[0];
   f.ll2 = l[1];
   f.ll3 = l[2];
   
-  int mean = (l[0] + l[1] + l[2])/3;
-  int d1 = (l[0] - mean)*(l[0] - mean);
-  int d2 = (l[1] - mean)*(l[1] - mean);
-  int d3 = (l[2] - mean)*(l[2] - mean);
+  mean = (l[0] + l[1] + l[2])/3;
+  d1 = (l[0] - mean)*(l[0] - mean);
+  d2 = (l[1] - mean)*(l[1] - mean);
+  d3 = (l[2] - mean)*(l[2] - mean);
   
   return max(score - (int) (sc.loop_mean_factor * pow(mean, sc.loop_mean_exponent)), 0);
 }
