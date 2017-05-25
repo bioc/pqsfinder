@@ -227,8 +227,8 @@ inline int score_pqs(
   // check if no more than one loop has zero length
   if (opts.loop_min_len == 0 &&
       ( (l[0] == 0 && l[1] == 0) ||
-      (l[0] == 0 && l[2] == 0) ||
-      (l[1] == 0 && l[2] == 0) ) ) {
+        (l[0] == 0 && l[2] == 0) ||
+        (l[1] == 0 && l[2] == 0) ) ) {
     return 0;
   }
 
