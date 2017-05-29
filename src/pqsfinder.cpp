@@ -110,7 +110,7 @@ public:
  */
 inline void print_pqs(const run_match m[], int score, const string::const_iterator ref, const int cnt)
 {
-  Rcout << m[0].first - ref + 1 << " " << m[3].second - m[0].first << " " << cnt << " "  << "[" << string(m[0].first, m[0].second) << "]";
+  Rcout << m[0].first - ref + 1 << "-" << m[3].second - m[0].first << " " << "[" << string(m[0].first, m[0].second) << "]";
   for (int i = 1; i < RUN_CNT; i++)
     Rcout << string(m[i-1].second, m[i].first) << "[" << string(m[i].first, m[i].second) << "]";
   Rcout << " " << score << endl;
@@ -180,7 +180,7 @@ inline int score_run_defects(
       ++mismatches;
     } else if (w[i] > w[pi] && g[i] >= g[pi]) {
       ++bulges;
-      score = score - sc.bulge_len_factor * pow(w[i] - w[pi], sc.bulge_len_exponent);
+      score = score - (int) round(sc.bulge_len_factor * pow(w[i] - w[pi], sc.bulge_len_exponent));
     } else {
       return 0;
     }
@@ -218,7 +218,8 @@ inline int score_pqs(
     const scoring &sc, const opts_t &opts)
 {
   int w[RUN_CNT], g[RUN_CNT], l[RUN_CNT - 1];
-  int min_pw, pi, score, mean, d1, d2, d3;
+  int min_pw, pi, score;
+  double mean;
   
   l[0] = m[1].first - m[0].second;
   l[1] = m[2].first - m[1].second;
@@ -263,12 +264,9 @@ inline int score_pqs(
   f.ll2 = l[1];
   f.ll3 = l[2];
   
-  mean = (l[0] + l[1] + l[2])/3;
-  d1 = (l[0] - mean)*(l[0] - mean);
-  d2 = (l[1] - mean)*(l[1] - mean);
-  d3 = (l[2] - mean)*(l[2] - mean);
+  mean = (double) (l[0] + l[1] + l[2]) / 3.0;
   
-  return max(score - (int) (sc.loop_mean_factor * pow(mean, sc.loop_mean_exponent)), 0);
+  return max(score - (int) round(sc.loop_mean_factor * pow(mean, sc.loop_mean_exponent)), 0);
 }
 
 
@@ -589,7 +587,7 @@ void find_all_runs(
       if (flags.use_cache && cache_entry.density[0] > pqs_cache::use_treshold)
         ctable.put(s, min(s + opts.max_len, end), cache_entry);
 
-      // add locally accumulated density to global density array
+      // add locally accumulated max scores to global max scores array
       res.save_density_and_max_scores(
         s, ref, strand, cache_entry.density, cache_entry.max_scores, opts.max_len);
     }
