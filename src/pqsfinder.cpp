@@ -655,7 +655,7 @@ void pqs_search(
 }
 
 
-//' Identificate potential quadruplex forming sequences.
+//' Identify potential quadruplex forming sequences.
 //'
 //' Function for identification of all potential intramolecular quadruplex
 //' patterns (PQS) in DNA sequence.

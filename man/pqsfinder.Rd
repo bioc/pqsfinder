@@ -2,7 +2,7 @@
 % Please edit documentation in R/RcppExports.R
 \name{pqsfinder}
 \alias{pqsfinder}
-\title{Identificate potential quadruplex forming sequences.}
+\title{Identify potential quadruplex forming sequences.}
 \usage{
 pqsfinder(subject, strand = "*", overlapping = FALSE, max_len = 50L,
   min_score = 26L, run_min_len = 2L, run_max_len = 11L,
