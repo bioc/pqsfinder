@@ -106,9 +106,8 @@ public:
  * @param m Quadruplex runs
  * @param score Score
  * @param ref Reference point, typically start of sequence
- * @param cnt Counter
  */
-inline void print_pqs(const run_match m[], int score, const string::const_iterator ref, const int cnt)
+inline void print_pqs(const run_match m[], int score, const string::const_iterator ref)
 {
   Rcout << m[0].first - ref + 1 << "-" << m[3].second - m[0].first << " " << "[" << string(m[0].first, m[0].second) << "]";
   for (int i = 1; i < RUN_CNT; i++)
@@ -159,7 +158,6 @@ void count_g(std::string seq) {
  * @param l Run lenghts.
  * @param f PQS features.
  * @param sc Scoring options.
- * @param opts Algorithm options.
  * @return Scoring for G-runs.
  */
 inline int score_run_defects(
@@ -167,8 +165,7 @@ inline int score_run_defects(
     const int w[],
     const int g[],
     features_t &f,
-    const scoring &sc,
-    const opts_t &opts)
+    const scoring &sc)
 {
   int mismatches = 0, bulges = 0, perfects = 0;
   int score = 0;
@@ -213,9 +210,8 @@ inline int score_run_defects(
 inline int score_pqs(
     run_match m[],
     features_t &f,
-    const string::const_iterator start,
-    const string::const_iterator end,
-    const scoring &sc, const opts_t &opts)
+    const scoring &sc,
+    const opts_t &opts)
 {
   int w[RUN_CNT], g[RUN_CNT], l[RUN_CNT - 1];
   int min_pw, pi, score;
@@ -255,7 +251,7 @@ inline int score_pqs(
     return 0;
   }
 
-  score = score_run_defects(pi, w, g, f, sc, opts);
+  score = score_run_defects(pi, w, g, f, sc);
   if (score <= 0) {
     return 0;
   }
@@ -392,6 +388,16 @@ inline bool find_run(
   }
 }
 
+
+/**
+ * Debug start and end coordinates during the iterative process.
+ * 
+ * @param name Label
+ * @param i Start index
+ * @param s Start of region
+ * @param e End of region
+ * @param ref Reference point, typically start of sequence
+ */
 void debug_s_e(
     const char *name,
     int i,
@@ -399,12 +405,12 @@ void debug_s_e(
     string::const_iterator &e,
     const string::const_iterator &ref) {
   
-  // int s_i = s - ref + 1;
-  // int e_i = e - ref;
-  // 
-  // if (s_i == 6 || s_i == 7) {
-  //   Rprintf("[%d] %s: %d %d\n", i, name, s_i, e_i);
-  // }
+  int s_i = s - ref + 1;
+  int e_i = e - ref;
+
+  if (s_i == 6 || s_i == 7) {
+    Rprintf("[%d] %s: %d %d\n", i, name, s_i, e_i);
+  }
 }
 
 
@@ -497,13 +503,9 @@ void find_all_runs(
 
     for (e = end; e >= min_e && find_run(s, e, m[i], run_re_c, opts, flags); e--)
     {
-      debug_s_e("A", i, s, e, ref);
-      
       // update search bounds
       s = string::const_iterator(m[i].first);
       e = string::const_iterator(m[i].second);
-      
-      debug_s_e("B", i, s, e, ref);
       
       loop_len = s - m[i-1].second;
       if (loop_len == 0) {
@@ -550,9 +552,8 @@ void find_all_runs(
         score = 0;
         features_t pqs_features;
         if (flags.use_default_scoring) {
-          score = score_pqs(m, pqs_features, ref, end, sc, opts);
+          score = score_pqs(m, pqs_features, sc, opts);
         }
-        debug_s_e("C", i, s, e, ref);
         if ((score || !flags.use_default_scoring) && sc.custom_scoring_fn != NULL) {
           check_custom_scoring_fn(score, m, sc, subject, ref);
         }
@@ -577,11 +578,10 @@ void find_all_runs(
               cache_entry.f = pqs_features;
             }
             if (flags.verbose)
-              print_pqs(m, score, ref, cache_entry.density[0]);
+              print_pqs(m, score, ref);
           }
         }
       }
-      debug_s_e("D", i, s, e, ref);
     }
     if (i == 0) {
       if (flags.use_cache && cache_entry.density[0] > pqs_cache::use_treshold)
