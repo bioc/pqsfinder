@@ -682,7 +682,6 @@ void pqs_search(
 //'   max_mismatches}).
 //' @param tetrad_bonus Score bonus for one complete G tetrade.
 //' @param mismatch_penalty Penalization for a mismatch in tetrad.
-//' @param edge_mismatch_penalty Penalization for an mismatch in edge tetrad.
 //' @param bulge_penalty Penalization for a bulge in quadruplex run.
 //' @param bulge_len_factor Penalization factor for a bulge length.
 //' @param bulge_len_exponent Exponent of bulge length.
