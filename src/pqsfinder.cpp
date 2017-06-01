@@ -8,6 +8,7 @@
 
 #include <Rcpp.h>
 #include <string>
+#include <climits>
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
@@ -49,7 +50,6 @@ public:
   double bulge_len_factor;
   double bulge_len_exponent;
   int mismatch_penalty;
-  int edge_mismatch_penalty;
   double loop_mean_factor;
   double loop_mean_exponent;
   int max_bulges;
@@ -83,7 +83,6 @@ typedef struct opts {
   int max_len;
   int min_score;
   int run_min_len;
-  int run_min_len_real;
   int run_max_len;
   int loop_min_len;
   int loop_max_len;
@@ -107,11 +106,10 @@ public:
  * @param m Quadruplex runs
  * @param score Score
  * @param ref Reference point, typically start of sequence
- * @param cnt Counter
  */
-inline void print_pqs(const run_match m[], int score, const string::const_iterator ref, const int cnt)
+inline void print_pqs(const run_match m[], int score, const string::const_iterator ref)
 {
-  Rcout << m[0].first - ref + 1 << " " << cnt << " "  << "[" << string(m[0].first, m[0].second) << "]";
+  Rcout << m[0].first - ref + 1 << "-" << m[3].second - m[0].first << " " << "[" << string(m[0].first, m[0].second) << "]";
   for (int i = 1; i < RUN_CNT; i++)
     Rcout << string(m[i-1].second, m[i].first) << "[" << string(m[i].first, m[i].second) << "]";
   Rcout << " " << score << endl;
@@ -158,61 +156,38 @@ void count_g(std::string seq) {
  * @param w Run widths.
  * @param g G contents.
  * @param l Run lenghts.
- * @param pqs_ends Output array indicating extension of the PQS start or end.
  * @param f PQS features.
  * @param sc Scoring options.
- * @param opts Algorithm options.
  * @return Scoring for G-runs.
  */
 inline int score_run_defects(
     const int pi,
     const int w[],
     const int g[],
-    int l[], bool pqs_ends[],
     features_t &f,
-    const scoring &sc,
-    const opts_t &opts)
+    const scoring &sc)
 {
-  int inner_mismatches = 0, edge_mismatches = 0, bulges = 0, perfects = 0;
+  int mismatches = 0, bulges = 0, perfects = 0;
   int score = 0;
   
   for (int i = 0; i < RUN_CNT; ++i) {
     if (w[i] == w[pi] && g[i] == g[pi]) {
       ++perfects;
     } else if ((w[i] == w[pi] && g[i] == g[pi] - 1)) {
-      ++inner_mismatches;
-    } else if (w[i] == w[pi] - 1 && g[i] == g[pi] - 1) {
-      if (i == 0) {
-        pqs_ends[0] = true;
-      } else if (i == 1 || i == 2) {
-        // check if loops are able to absorb the mismatches
-        if (l[i-1] > opts.loop_min_len) {
-          --l[i-1];
-        } else if (l[i] > opts.loop_min_len) {
-          --l[i];
-        } else {
-          return 0;
-        }
-      } else if (i == 3) {
-        pqs_ends[1] = true;
-      }
-      ++edge_mismatches;
+      ++mismatches;
     } else if (w[i] > w[pi] && g[i] >= g[pi]) {
       ++bulges;
-      score = score - sc.bulge_len_factor * pow(w[i] - w[pi], sc.bulge_len_exponent);
+      score = score - (int) round(sc.bulge_len_factor * pow(w[i] - w[pi], sc.bulge_len_exponent));
     } else {
       return 0;
     }
   }
-  int mismatches = inner_mismatches + edge_mismatches;
-  
   if (mismatches <= sc.max_mimatches &&
       bulges <= sc.max_bulges &&
       mismatches + bulges <= sc.max_defects)
   {
     score = score + (w[pi] - 1) * sc.tetrad_bonus
-            - inner_mismatches * sc.mismatch_penalty
-            - edge_mismatches * sc.edge_mismatch_penalty
+            - mismatches * sc.mismatch_penalty
             - bulges * sc.bulge_penalty;
     f.nt = w[pi];
     f.nb = bulges;
@@ -235,17 +210,24 @@ inline int score_run_defects(
 inline int score_pqs(
     run_match m[],
     features_t &f,
-    const string::const_iterator start,
-    const string::const_iterator end,
-    const scoring &sc, const opts_t &opts)
+    const scoring &sc,
+    const opts_t &opts)
 {
   int w[RUN_CNT], g[RUN_CNT], l[RUN_CNT - 1];
-  int l_tmp[RUN_CNT][RUN_CNT - 1];
-  bool pqs_ends[RUN_CNT][2] = {0};
-  int tmp_score[RUN_CNT];
-  features_t f_tmp[RUN_CNT];
+  int min_pw, pi, score;
+  double mean;
   
-  int score = 0;
+  l[0] = m[1].first - m[0].second;
+  l[1] = m[2].first - m[1].second;
+  l[2] = m[3].first - m[2].second;
+  
+  // check if no more than one loop has zero length
+  if (opts.loop_min_len == 0 &&
+      ( (l[0] == 0 && l[1] == 0) ||
+        (l[0] == 0 && l[2] == 0) ||
+        (l[1] == 0 && l[2] == 0) ) ) {
+    return 0;
+  }
 
   w[0] = m[0].length();
   w[1] = m[1].length();
@@ -257,74 +239,20 @@ inline int score_pqs(
   g[2] = count_g_num(m[2]);
   g[3] = count_g_num(m[3]);
   
-  l[0] = m[1].first - m[0].second;
-  l[1] = m[2].first - m[1].second;
-  l[2] = m[3].first - m[2].second;
-  
-  l_tmp[0][0] = l[0];
-  l_tmp[0][1] = l[1];
-  l_tmp[0][2] = l[2];
-  l_tmp[1][0] = l[0];
-  l_tmp[1][1] = l[1];
-  l_tmp[1][2] = l[2];
-  l_tmp[2][0] = l[0];
-  l_tmp[2][1] = l[1];
-  l_tmp[2][2] = l[2];
-  l_tmp[3][0] = l[0];
-  l_tmp[3][1] = l[1];
-  l_tmp[3][2] = l[2];
+  min_pw = INT_MAX;
+  pi = -1;
+  for (int i = 0; i < RUN_CNT; ++i) {
+    if (w[i] < min_pw && g[i] == w[i]) {
+      min_pw = w[i];
+      pi = i;
+    }
+  }
+  if (pi < 0) {
+    return 0;
+  }
 
-  tmp_score[0] = g[0] == w[0] && w[0] >= opts.run_min_len_real ?
-                  score_run_defects(0, w, g, l_tmp[0], pqs_ends[0], f_tmp[0], sc, opts) : 0;
-  tmp_score[1] = g[1] == w[1] && w[1] >= opts.run_min_len_real ?
-                  score_run_defects(1, w, g, l_tmp[1], pqs_ends[1], f_tmp[1], sc, opts) : 0;
-  tmp_score[2] = g[2] == w[2] && w[2] >= opts.run_min_len_real ?
-                  score_run_defects(2, w, g, l_tmp[2], pqs_ends[2], f_tmp[2], sc, opts) : 0;
-  tmp_score[3] = g[3] == w[3] && w[3] >= opts.run_min_len_real ?
-                  score_run_defects(3, w, g, l_tmp[3], pqs_ends[3], f_tmp[3], sc, opts) : 0;
-
-  int max_i = 0;
-  max_i = tmp_score[1] > tmp_score[max_i] ? 1 : max_i;
-  max_i = tmp_score[2] > tmp_score[max_i] ? 2 : max_i;
-  max_i = tmp_score[3] > tmp_score[max_i] ? 3 : max_i;
-
-  score = tmp_score[max_i];
+  score = score_run_defects(pi, w, g, f, sc);
   if (score <= 0) {
-    return 0;
-  }
-  l[0] = l_tmp[max_i][0];
-  l[1] = l_tmp[max_i][1];
-  l[2] = l_tmp[max_i][2];
-  f = f_tmp[max_i];
-  
-  if (pqs_ends[max_i][0]) {
-    // absorb mismatch in the first run
-    if (l[0] > opts.loop_min_len) {
-      ++m[0].second;
-      --l[0];
-    } else {
-      m[0].first = max(m[0].first - 1, start);
-    }
-  }
-  if (pqs_ends[max_i][1]) {
-    // absorb mismatch in the last run
-    if (l[2] > opts.loop_min_len) {
-      --m[3].first;
-      --l[2];
-    } else {
-      m[3].second = min(m[3].second + 1, end);
-    }
-  }
-  /* check if pqs did not exceed the total length limit after
-     mismatch absorbtion */
-  if (m[3].second - m[0].first > opts.max_len) {
-    return 0;
-  }
-  // check if no more than one loop has zero length
-  if (opts.loop_min_len == 0 &&
-       ( (l[0] == 0 && l[1] == 0) ||
-         (l[0] == 0 && l[2] == 0) ||
-         (l[1] == 0 && l[2] == 0) ) ) {
     return 0;
   }
   // update reported loop lengths
@@ -332,12 +260,9 @@ inline int score_pqs(
   f.ll2 = l[1];
   f.ll3 = l[2];
   
-  int mean = (l[0] + l[1] + l[2])/3;
-  int d1 = (l[0] - mean)*(l[0] - mean);
-  int d2 = (l[1] - mean)*(l[1] - mean);
-  int d3 = (l[2] - mean)*(l[2] - mean);
+  mean = (double) (l[0] + l[1] + l[2]) / 3.0;
   
-  return max(score - (int) (sc.loop_mean_factor * pow(mean, sc.loop_mean_exponent)), 0);
+  return max(score - (int) round(sc.loop_mean_factor * pow(mean, sc.loop_mean_exponent)), 0);
 }
 
 
@@ -465,6 +390,31 @@ inline bool find_run(
 
 
 /**
+ * Debug start and end coordinates during the iterative process.
+ * 
+ * @param name Label
+ * @param i Start index
+ * @param s Start of region
+ * @param e End of region
+ * @param ref Reference point, typically start of sequence
+ */
+void debug_s_e(
+    const char *name,
+    int i,
+    string::const_iterator &s,
+    string::const_iterator &e,
+    const string::const_iterator &ref) {
+  
+  int s_i = s - ref + 1;
+  int e_i = e - ref;
+
+  if (s_i == 6 || s_i == 7) {
+    Rprintf("[%d] %s: %d %d\n", i, name, s_i, e_i);
+  }
+}
+
+
+/**
  * Recursively idetify 4 consecutive runs making quadruplex
  *
  * @param subject DNAString object
@@ -554,8 +504,8 @@ void find_all_runs(
     for (e = end; e >= min_e && find_run(s, e, m[i], run_re_c, opts, flags); e--)
     {
       // update search bounds
-      s = m[i].first;
-      e = m[i].second;
+      s = string::const_iterator(m[i].first);
+      e = string::const_iterator(m[i].second);
       
       loop_len = s - m[i-1].second;
       if (loop_len == 0) {
@@ -602,10 +552,7 @@ void find_all_runs(
         score = 0;
         features_t pqs_features;
         if (flags.use_default_scoring) {
-          score = score_pqs(m, pqs_features, ref, end, sc, opts);
-          // score = score_pqs_old(m, sc, opts);
-          // score_run_content(score, m, sc);
-          // score_loop_lengths(score, m, sc);
+          score = score_pqs(m, pqs_features, sc, opts);
         }
         if ((score || !flags.use_default_scoring) && sc.custom_scoring_fn != NULL) {
           check_custom_scoring_fn(score, m, sc, subject, ref);
@@ -631,7 +578,7 @@ void find_all_runs(
               cache_entry.f = pqs_features;
             }
             if (flags.verbose)
-              print_pqs(m, score, ref, cache_entry.density[0]);
+              print_pqs(m, score, ref);
           }
         }
       }
@@ -640,7 +587,7 @@ void find_all_runs(
       if (flags.use_cache && cache_entry.density[0] > pqs_cache::use_treshold)
         ctable.put(s, min(s + opts.max_len, end), cache_entry);
 
-      // add locally accumulated density to global density array
+      // add locally accumulated max scores to global max scores array
       res.save_density_and_max_scores(
         s, ref, strand, cache_entry.density, cache_entry.max_scores, opts.max_len);
     }
@@ -708,7 +655,7 @@ void pqs_search(
 }
 
 
-//' Identificate potential quadruplex forming sequences.
+//' Identify potential quadruplex forming sequences.
 //'
 //' Function for identification of all potential intramolecular quadruplex
 //' patterns (PQS) in DNA sequence.
@@ -735,7 +682,6 @@ void pqs_search(
 //'   max_mismatches}).
 //' @param tetrad_bonus Score bonus for one complete G tetrade.
 //' @param mismatch_penalty Penalization for a mismatch in tetrad.
-//' @param edge_mismatch_penalty Penalization for an mismatch in edge tetrad.
 //' @param bulge_penalty Penalization for a bulge in quadruplex run.
 //' @param bulge_len_factor Penalization factor for a bulge length.
 //' @param bulge_len_exponent Exponent of bulge length.
@@ -790,14 +736,13 @@ SEXP pqsfinder(
     int max_mismatches = 3,
     int max_defects = 3,
     int tetrad_bonus = 40,
-    int mismatch_penalty = 29,
-    int edge_mismatch_penalty = 27,
-    int bulge_penalty = 21,
-    double bulge_len_factor = 0.7,
-    double bulge_len_exponent = 0.8,
-    double loop_mean_factor = 4.5,
-    double loop_mean_exponent = 1,
-    std::string run_re = ".?G{1,10}.{0,9}G{1,10}.?",
+    int mismatch_penalty = 28,
+    int bulge_penalty = 20,
+    double bulge_len_factor = 0.2,
+    double bulge_len_exponent = 1,
+    double loop_mean_factor = 6.6,
+    double loop_mean_exponent = 0.8,
+    std::string run_re = "G{1,10}.{0,9}G{1,10}",
     SEXP custom_scoring_fn = R_NilValue,
     bool use_default_scoring = true,
     bool verbose = false)
@@ -847,7 +792,7 @@ SEXP pqsfinder(
   flags.verbose = verbose;
   flags.use_default_scoring = use_default_scoring;
 
-  if (run_re != ".?G{1,10}.{0,9}G{1,10}.?") {
+  if (run_re != "G{1,10}.{0,9}G{1,10}") {
     // User specified its own regexp, force to use regexp engine
     flags.use_re = true;
   }
@@ -859,13 +804,8 @@ SEXP pqsfinder(
   opts.loop_max_len = loop_max_len;
   opts.loop_min_len = loop_min_len;
   opts.run_max_len = run_max_len;
-  if (run_min_len > 2 && flags.use_default_scoring && !flags.use_re) {
-    opts.run_min_len = run_min_len - 1;
-    opts.run_min_len_real = run_min_len;
-  } else {
-    opts.run_min_len = run_min_len;
-    opts.run_min_len_real = run_min_len;
-  }
+  opts.run_min_len = run_min_len;
+  
   if (flags.use_re) {
     opts.check_int_period = 1e6;
   } else {
@@ -877,7 +817,6 @@ SEXP pqsfinder(
   sc.bulge_len_factor = bulge_len_factor;
   sc.bulge_len_exponent = bulge_len_exponent;
   sc.mismatch_penalty = mismatch_penalty;
-  sc.edge_mismatch_penalty = edge_mismatch_penalty;
   sc.loop_mean_factor = loop_mean_factor;
   sc.loop_mean_exponent = loop_mean_exponent;
   sc.max_bulges = max_bulges;

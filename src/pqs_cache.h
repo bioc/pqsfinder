@@ -21,7 +21,7 @@ class pqs_cache {
 public:
   class entry {
   private:
-    void init(const int max_len) {
+    void init() {
       this->density = (int *)calloc(this->max_len, sizeof(int));
       if (this->density == NULL)
         throw runtime_error("Unable to allocate memory for cache density vector.");
@@ -37,11 +37,11 @@ public:
     features_t f;
     const int max_len;
     entry(const int max_len) : score(0), len(0), max_len(max_len) {
-      init(max_len);
+      init();
       memset(&f, 0, sizeof(features_t));
     }
-    entry(const entry &obj) : score(obj.score), len(obj.len), max_len(obj.max_len), f(obj.f) {
-      init(obj.max_len);
+    entry(const entry &obj) : score(obj.score), len(obj.len), f(obj.f), max_len(obj.max_len) {
+      init();
       memcpy(this->density, obj.density, this->max_len);
       memcpy(this->max_scores, obj.max_scores, this->max_len);
     }

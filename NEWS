@@ -1,3 +1,14 @@
+CHANGES IN VERSION 1.4.x
+------------------------
+
+BUG FIXES
+
+    o Updated default scoring parameters to slightly better-performing
+      combination.
+    o Removed bug-prone special support for edge mismatches.
+    o Fixed integer division to floating point division in the
+      computation of loop length mean.
+
 CHANGES IN VERSION 1.3.x
 ------------------------
 
