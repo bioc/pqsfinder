@@ -109,7 +109,7 @@ public:
  */
 inline void print_pqs(const run_match m[], int score, const string::const_iterator ref)
 {
-  Rcout << m[0].first - ref + 1 << "-" << m[3].second - m[0].first << " " << "[" << string(m[0].first, m[0].second) << "]";
+  Rcout << m[0].first - ref + 1 << "-" << m[3].second - ref << " " << "[" << string(m[0].first, m[0].second) << "]";
   for (int i = 1; i < RUN_CNT; i++)
     Rcout << string(m[i-1].second, m[i].first) << "[" << string(m[i].first, m[i].second) << "]";
   Rcout << " " << score << endl;

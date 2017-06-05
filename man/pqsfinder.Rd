@@ -86,8 +86,6 @@ format: \code{start cnt pqs_sequence score}, where \code{start} is the PQS
 starting position, \code{pqs_sequence} shows the PQS sequence structure
 with each run surrounded by square brackets and \code{score} is the score
 assigned to the particular PQS by all applied scoring functions.}
-
-\item{edge_mismatch_penalty}{Penalization for an mismatch in edge tetrad.}
 }
 \value{
 \code{\link{PQSViews}} object

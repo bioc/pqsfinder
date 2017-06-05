@@ -188,4 +188,135 @@ public:
   }
 };
 
+class pqs_storage_non_overlapping_2: public pqs_storage {
+private:
+  class range {
+  public:
+    string::const_iterator s;
+    string::const_iterator e;
+    features_t f;
+    range(string::const_iterator &s, string::const_iterator &e, features_t &f) :
+      s(s), e(e), f(f) {};
+    range() {};
+  };
+  typedef map< int, list<range> > storage_t;
+  storage_t st;
+  
+  typedef struct pqs {
+    int score;
+    string::const_iterator s;
+    string::const_iterator e;
+  } pqs_t;
+  pqs_t best;
+  
+public:
+  pqs_storage_non_overlapping_2() {
+    this->best.score = 0;
+  }
+  virtual void insert_pqs(
+      int score, string::const_iterator s, string::const_iterator e, features_t &f,
+      results &res, const string::const_iterator &ref, const string &strand)
+  {
+    if (this->best.score && s >= this->best.e)
+    {// export PQS because no further overlapping pqs can be found
+      this->export_pqs(res, ref, strand);
+    }
+    if (score > this->best.score ||
+        (score == this->best.score &&
+        this->best.s <= s && e <= this->best.e)) {
+      this->best.score = score;
+      this->best.s = s;
+      this->best.e = e;
+    }
+    storage_t::iterator it = st.find(score);
+    if (it != st.end()) {
+      list<range> &list = it->second;
+      if (list.empty()) {
+        throw runtime_error("Inconsistent state of non-overlapping storage.");
+      }
+      // Insert new pqs
+      list.push_back(range(s, e, f));
+    }
+    else {
+      st.insert(storage_t::value_type(score, list<range>(1, range(s, e, f))));
+    }
+  }
+  virtual void export_pqs(
+      results &res, const string::const_iterator &ref,
+      const string &strand)
+  {
+    this->best.score = 0; // reset
+    
+    range best_pqs;
+    storage_t::iterator it;
+    storage_t::iterator temp;
+    list<range>::iterator curr;
+    list<range>::iterator prev;
+    
+    while (!st.empty()) {
+      it = --st.end(); // decrement to point on last list
+      
+      // resolve overlaps between equal-scoring PQS
+      prev = it->second.begin();
+      curr = next(prev);
+      
+      while (curr != it->second.end()) {
+        if (curr->s < prev->e) {
+          it->second.erase(curr);
+          curr = next(prev);
+        } else if (prev->s <= curr->s && curr->e <= prev->e) {
+          it->second.erase(prev);
+          prev = curr;
+          ++curr;
+        } else {
+          prev = curr;
+          ++curr;
+        }
+      }
+      if (it->second.empty()) {
+        throw runtime_error("Inconsistent state of non-overlapping PQS list.");
+      }
+      while (!it->second.empty()) {
+        best_pqs = it->second.back();
+        res.save_pqs(it->first, best_pqs.s, best_pqs.e, best_pqs.f, ref, strand);
+        
+        while (true) {
+          // remove all overlapping PQS with lower score
+          // Rcout << "Removing from list " << it->first << endl;
+          list<range> &list = it->second;
+          while (!list.empty() &&
+                 ((list.back().s <= best_pqs.s && best_pqs.s < list.back().e) ||
+                 (best_pqs.s <= list.back().s && list.back().s < best_pqs.e)))  {
+            list.pop_back();
+          }
+          if (it == st.begin()) {
+            // the end of iteration
+            if (list.empty())
+              st.erase(it);
+            break;
+          }
+          else if (list.empty()) {
+            // delete empty list from storage
+            temp = it; // erase operation invalidates iterator
+            --it;
+            st.erase(temp);
+          }
+          else {
+            --it;
+          }
+        }
+      }
+    }
+  }
+  inline void print() {
+    for (storage_t::const_iterator it = st.begin(); it != st.end(); ++it) {
+      Rcout << it->first << ":";
+      for (list<range>::const_iterator lit = it->second.begin(); lit != it->second.end(); ++lit) {
+        Rcout << " " << string(lit->s, lit->e);
+      }
+      Rcout << endl;
+    }
+  }
+};
+
 #endif // PQS_STORAGE_HEADER
