@@ -857,10 +857,12 @@ SEXP pqsfinder(
   if (strand == "+" || strand == "*") {
     Rcout << "Searching on sense strand..." << endl;
     pqs_search(subject, seq, "+", run_re_c, ctable, sc, opts, flags, res);
+    Rcout << "Search status: finished              " << endl;
   }
   if (strand == "-" || strand == "*") {
     Rcout << "Searching on antisense strand..." << endl;
     pqs_search(subject_rc, seq_rc, "-", run_re_c, ctable, sc, opts, flags, res);
+    Rcout << "Search status: finished              " << endl;
   }
 
   #ifdef _GLIBCXX_DEBUG
