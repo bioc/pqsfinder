@@ -785,7 +785,7 @@ SEXP pqsfinder(
     throw invalid_argument("Subject must be DNAString object.");
 
   flags_t flags;
-  flags.use_cache = overlapping ? false : true;
+  flags.use_cache = false; // TODO: issue on hg38 chrY
   flags.use_re = false;
   flags.use_prof = false;
   flags.debug = false;
