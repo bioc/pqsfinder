@@ -3,7 +3,7 @@ CHANGES IN VERSION 1.4.x
 
 BUG FIXES
 
-    o Fixed failure on hg38 sequence of Y chromosome.
+    o Fixed inefficient looping through long non-guanine sequence regions.
     o Updated default scoring parameters to slightly better-performing
       combination.
     o Removed bug-prone special support for edge mismatches.
