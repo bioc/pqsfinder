@@ -346,21 +346,31 @@ inline bool find_run(
     const opts_t &opts,
     const flags_t &flags)
 {
+  string::const_iterator s = start, e;
+  
   if (flags.use_re) {
     static boost::smatch boost_m;
-    string::const_iterator s, e;
-    bool status = run_regex_search(start, end, boost_m, run_re_c);
+    bool status = false;
     
-    if (status) {
+    while (s < end) {
+      status = run_regex_search(s, end, boost_m, run_re_c);
+      if (!status) {
+        break;
+      }
       if (boost_m[0].second - boost_m[0].first > opts.run_max_len) {
-        // too long run found, search again with limited end
         s = boost_m[0].first;
         e = min(s + opts.run_max_len, end);
         status = run_regex_search(s, e, boost_m, run_re_c);
-        if (!status) {
-          return false;
+        if (status) {
+          break;
+        } else {
+          ++s;
         }
+      } else {
+        break;
       }
+    }
+    if (status) {
       if (boost_m[0].second - boost_m[0].first < opts.run_min_len) {
         return false;
       }
@@ -371,13 +381,18 @@ inline bool find_run(
       return false;
     }
   } else {
-    string::const_iterator s = start, e;
-    
-    while (*s != 'G' && s < end) ++s;
-    e = min(s + opts.run_max_len, end);
-    --e; // <e> points to past-the-end character and as such should not be dereferenced
-    while (*e != 'G' && e > s) --e;
-
+    while (s < end) {
+      while (*s != 'G' && s < end) ++s;
+      e = min(s + opts.run_max_len, end);
+      --e; // <e> points to past-the-end character and as such should not be dereferenced
+      while (*e != 'G' && e > s) --e;
+      
+      if (e - s + 1 >= opts.run_min_len) {
+        break;
+      } else {
+        ++s;
+      }
+    }
     if (e - s + 1 < opts.run_min_len) {
       // definitely too short to be a proper run
       return false;
@@ -461,6 +476,7 @@ void find_all_runs(
   string::const_iterator s, e, min_e;
   int score, loop_len;
   pqs_cache::entry *cache_hit;
+  bool found_any;
   
   if (i > 0) {
     loop_len = start - m[i-1].second; 
@@ -500,9 +516,11 @@ void find_all_runs(
       }
     }
     min_e = s + opts.run_min_len;
+    found_any = false;
 
     for (e = end; e >= min_e && find_run(s, e, m[i], run_re_c, opts, flags); e--)
     {
+      found_any = true;
       // update search bounds
       s = string::const_iterator(m[i].first);
       e = string::const_iterator(m[i].second);
@@ -590,6 +608,9 @@ void find_all_runs(
       // add locally accumulated max scores to global max scores array
       res.save_density_and_max_scores(
         s, ref, strand, cache_entry.density, cache_entry.max_scores, opts.max_len);
+    }
+    if (!found_any) {
+      break;
     }
   }
 }
@@ -785,7 +806,7 @@ SEXP pqsfinder(
     throw invalid_argument("Subject must be DNAString object.");
 
   flags_t flags;
-  flags.use_cache = false; // TODO: issue on hg38 chrY
+  flags.use_cache = false; // TODO: cache implementation should be double checked
   flags.use_re = false;
   flags.use_prof = false;
   flags.debug = false;
