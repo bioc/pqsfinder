@@ -14,9 +14,13 @@ test_that("the result on test seq is the same as gives pqsfinder-1.4.4", {
   pv_d <- pqsfinder(test_seq, strand = "+")
   pv_r <- pqsfinder(test_seq, strand = "+", run_re = "G{1,10}.{0,10}G{1,10}")
   
+  cat("pv_d, pv_r\n")
   expect_equal_pv(pv_d, pv_r)
+  cat("pqsfinder_1_4_4_d, pqsfinder_1_4_4_r\n")
   expect_equal_pv(pqsfinder_1_4_4_d, pqsfinder_1_4_4_r)
   
+  cat("pv_d, pqsfinder_1_4_4_d\n")
   expect_equal_pv(pv_d, pqsfinder_1_4_4_d)
+  cat("pv_r, pqsfinder_1_4_4_r\n")
   expect_equal_pv(pv_r, pqsfinder_1_4_4_r)
 })
