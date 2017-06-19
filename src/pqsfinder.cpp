@@ -524,27 +524,24 @@ void find_all_runs(
       // update search bounds
       s = string::const_iterator(m[i].first);
       e = string::const_iterator(m[i].second);
-      
-      loop_len = s - m[i-1].second;
-      if (loop_len == 0) {
-        zero_loop = true;
-      }
-      if (i > 0 && loop_len > opts.loop_max_len)
-        return; // skip too long loops
 
-      if (i == 0)
+      if (i == 0) {
         // enforce G4 total length limit to be relative to the first G-run start
         find_all_runs(
           subject, strand, i+1, e, min(s + opts.max_len, end), m, run_re_c,
           opts, flags, sc, ref, len, s, pqs_storage, ctable, cache_entry,
-          pqs_cnt, res, zero_loop, s_time
+          pqs_cnt, res, false, s_time
         );
-      else if (i < 3)
+      } else if (i < 3) {
+        loop_len = s - m[i-1].second;
+        if (loop_len > opts.loop_max_len)
+          return; // skip too long loops
         find_all_runs(
           subject, strand, i+1, e, end, m, run_re_c, opts, flags, sc, ref, len,
-          pqs_start, pqs_storage, ctable, cache_entry, pqs_cnt, res, zero_loop, s_time
+          pqs_start, pqs_storage, ctable, cache_entry, pqs_cnt, res,
+          (loop_len == 0 ? true : zero_loop), s_time
         );
-      else {
+      } else {
         /* Check user interrupt after reasonable amount of PQS identified to react
          * on important user signals. I.e. he might want to abort the computation. */
         if (++pqs_cnt == opts.check_int_period)
