@@ -450,6 +450,7 @@ void debug_s_e(
  * @param pqs_cnt PQS counter
  * @param res Object for output PQS
  * @param zero_loop Flag, if PQS has zero-length loop
+ * @param s_time Starting time
  */
 void find_all_runs(
     SEXP subject,
@@ -464,7 +465,6 @@ void find_all_runs(
     const scoring &sc,
     const string::const_iterator &ref,
     const size_t len,
-    string::const_iterator &pqs_start,
     pqs_storage &pqs_storage,
     pqs_cache &ctable,
     pqs_cache::entry &cache_entry,
@@ -477,9 +477,9 @@ void find_all_runs(
   int score, loop_len;
   pqs_cache::entry *cache_hit;
   bool found_any;
-  
+
   if (i > 0) {
-    loop_len = start - m[i-1].second; 
+    loop_len = start - m[i-1].second;
     if (loop_len < opts.loop_min_len) {
       start = min(m[i-1].second + opts.loop_min_len, end); // skip too short loop
     } else if (flags.use_default_scoring && loop_len == 0 && zero_loop) {
@@ -524,22 +524,27 @@ void find_all_runs(
       // update search bounds
       s = string::const_iterator(m[i].first);
       e = string::const_iterator(m[i].second);
-
+      
       if (i == 0) {
         // enforce G4 total length limit to be relative to the first G-run start
         find_all_runs(
-          subject, strand, i+1, e, min(s + opts.max_len, end), m, run_re_c,
-          opts, flags, sc, ref, len, s, pqs_storage, ctable, cache_entry,
-          pqs_cnt, res, false, s_time
+          subject, strand, i+1, e, min(s + opts.max_len, end), m, run_re_c, opts,
+          flags, sc, ref, len, pqs_storage, ctable, cache_entry, pqs_cnt, res,
+          false, s_time
         );
       } else if (i < 3) {
         loop_len = s - m[i-1].second;
-        if (loop_len > opts.loop_max_len)
+        
+        if (loop_len == 0) {
+          zero_loop = true;
+        }
+        if (loop_len > opts.loop_max_len) {
           return; // skip too long loops
+        }
         find_all_runs(
           subject, strand, i+1, e, end, m, run_re_c, opts, flags, sc, ref, len,
-          pqs_start, pqs_storage, ctable, cache_entry, pqs_cnt, res,
-          (loop_len == 0 ? true : zero_loop), s_time
+          pqs_storage, ctable, cache_entry, pqs_cnt, res,
+          zero_loop, s_time
         );
       } else {
         /* Check user interrupt after reasonable amount of PQS identified to react
@@ -657,7 +662,6 @@ void pqs_search(
 {
   run_match m[RUN_CNT];
   pqs_cache::entry cache_entry(opts.max_len);
-  string::const_iterator pqs_start;
   int pqs_cnt = 0;
   pqs_storage_overlapping pqs_storage_ov(seq.begin());
   pqs_storage_non_overlapping pqs_storage_nov;
@@ -666,8 +670,8 @@ void pqs_search(
   // Global sequence length is the only limit for the first G-run
   find_all_runs(
     subject, strand, 0, seq.begin(), seq.end(), m, run_re_c, opts, flags, sc,
-    seq.begin(), seq.length(), pqs_start, pqs_storage, ctable,
-    cache_entry, pqs_cnt, res, 0, chrono::system_clock::now()
+    seq.begin(), seq.length(), pqs_storage, ctable,
+    cache_entry, pqs_cnt, res, false, chrono::system_clock::now()
   );
   pqs_storage.export_pqs(res, seq.begin(), strand);
 }
