@@ -3,7 +3,8 @@ CHANGES IN VERSION 1.4.x
 
 BUG FIXES
 
-    o Fixed bug that blocked alternative PQS with zero-length loop to be found.
+    o Fixed uninitialised variable causing slightly stochastic behaviour.
+    o Fixed bug blocking alternative PQS with zero-length loop to be found.
     o Fixed inefficient looping through long non-guanine sequence regions.
     o Updated default scoring parameters to slightly better-performing
       combination.
