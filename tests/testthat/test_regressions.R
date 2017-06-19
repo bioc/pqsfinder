@@ -8,8 +8,8 @@ expect_equal_pv <- function(pv_a, pv_b) {
   expect_equal(end(pv_a), end(pv_b))
 }
 
-test_that("the result on test seq is the same as gives pqsfinder-1.4.4", {
-  load("pqsfinder_1_4_4.RData")
+test_that("the result on test seq is the same as gives pqsfinder-1.4.4-patched", {
+  load("pqsfinder_1_4_4_patched.RData")
   
   pv_d <- pqsfinder(test_seq, strand = "+")
   pv_r <- pqsfinder(test_seq, strand = "+", run_re = "G{1,10}.{0,10}G{1,10}")
@@ -22,10 +22,10 @@ test_that("the result on test seq is the same as gives pqsfinder-1.4.4", {
   cat("pv_d, pv_r\n")
   expect_equal_pv(pv_d, pv_r)
   cat("pqsfinder_1_4_4_d, pqsfinder_1_4_4_r\n")
-  expect_equal_pv(pqsfinder_1_4_4_d, pqsfinder_1_4_4_r)
+  expect_equal_pv(pqsfinder_1_4_4_patched_d, pqsfinder_1_4_4_patched_r)
   
   cat("pv_d, pqsfinder_1_4_4_d\n")
-  expect_equal_pv(pv_d, pqsfinder_1_4_4_d)
+  expect_equal_pv(pv_d, pqsfinder_1_4_4_patched_d)
   cat("pv_r, pqsfinder_1_4_4_r\n")
-  expect_equal_pv(pv_r, pqsfinder_1_4_4_r)
+  expect_equal_pv(pv_r, pqsfinder_1_4_4_patched_r)
 })
