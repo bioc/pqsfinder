@@ -534,17 +534,13 @@ void find_all_runs(
         );
       } else if (i < 3) {
         loop_len = s - m[i-1].second;
-        
-        if (loop_len == 0) {
-          zero_loop = true;
-        }
         if (loop_len > opts.loop_max_len) {
           return; // skip too long loops
         }
         find_all_runs(
           subject, strand, i+1, e, end, m, run_re_c, opts, flags, sc, ref, len,
           pqs_storage, ctable, cache_entry, pqs_cnt, res,
-          zero_loop, s_time
+          (loop_len == 0 ? true : zero_loop), s_time
         );
       } else {
         /* Check user interrupt after reasonable amount of PQS identified to react
