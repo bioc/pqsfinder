@@ -624,7 +624,7 @@ void find_all_runs(
 pqs_storage &select_pqs_storage(
     bool overlapping,
     pqs_storage_overlapping &ov,
-    pqs_storage_non_overlapping &nov)
+    pqs_storage_non_overlapping_revised &nov)
 {
   if (overlapping)
     return ov;
@@ -660,7 +660,7 @@ void pqs_search(
   pqs_cache::entry cache_entry(opts.max_len);
   int pqs_cnt = 0;
   pqs_storage_overlapping pqs_storage_ov(seq.begin());
-  pqs_storage_non_overlapping pqs_storage_nov;
+  pqs_storage_non_overlapping_revised pqs_storage_nov(seq.begin());
   pqs_storage &pqs_storage = select_pqs_storage(opts.overlapping, pqs_storage_ov, pqs_storage_nov);
   
   // Global sequence length is the only limit for the first G-run

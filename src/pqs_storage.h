@@ -164,8 +164,7 @@ public:
           if (list.empty())
             st.erase(it);
           break;
-        }
-        else if (list.empty()) {
+        } else if (list.empty()) {
           // delete empty list from storage
           temp = it; // erase operation invalidates iterator
           --it;
@@ -188,7 +187,7 @@ public:
   }
 };
 
-class pqs_storage_non_overlapping_2: public pqs_storage {
+class pqs_storage_non_overlapping_revised: public pqs_storage {
 private:
   class range {
   public:
@@ -201,32 +200,21 @@ private:
   };
   typedef map< int, list<range> > storage_t;
   storage_t st;
-  
-  typedef struct pqs {
-    int score;
-    string::const_iterator s;
-    string::const_iterator e;
-  } pqs_t;
-  pqs_t best;
+  string::const_iterator last_e;
   
 public:
-  pqs_storage_non_overlapping_2() {
-    this->best.score = 0;
-  }
+  pqs_storage_non_overlapping_revised(string::const_iterator start) : last_e(start) {}
+  
   virtual void insert_pqs(
       int score, string::const_iterator s, string::const_iterator e, features_t &f,
       results &res, const string::const_iterator &ref, const string &strand)
   {
-    if (this->best.score && s >= this->best.e)
+    if (s >= this->last_e && !this->st.empty())
     {// export PQS because no further overlapping pqs can be found
       this->export_pqs(res, ref, strand);
     }
-    if (score > this->best.score ||
-        (score == this->best.score &&
-        this->best.s <= s && e <= this->best.e)) {
-      this->best.score = score;
-      this->best.s = s;
-      this->best.e = e;
+    if (e > this->last_e) {
+      this->last_e = e;
     }
     storage_t::iterator it = st.find(score);
     if (it != st.end()) {
@@ -245,13 +233,9 @@ public:
       results &res, const string::const_iterator &ref,
       const string &strand)
   {
-    this->best.score = 0; // reset
-    
     range best_pqs;
-    storage_t::iterator it;
-    storage_t::iterator temp;
-    list<range>::iterator curr;
-    list<range>::iterator prev;
+    storage_t::iterator it, r_it, temp;
+    list<range>::iterator prev, curr;
     
     while (!st.empty()) {
       it = --st.end(); // decrement to point on last list
@@ -261,13 +245,13 @@ public:
       curr = next(prev);
       
       while (curr != it->second.end()) {
-        if (curr->s < prev->e) {
-          it->second.erase(curr);
-          curr = next(prev);
-        } else if (prev->s <= curr->s && curr->e <= prev->e) {
+        if (prev->s <= curr->s && curr->e <= prev->e) {
           it->second.erase(prev);
           prev = curr;
           ++curr;
+        } else if (prev->e > curr->s) {
+          it->second.erase(curr);
+          curr = std::next(prev);
         } else {
           prev = curr;
           ++curr;
@@ -277,35 +261,48 @@ public:
         throw runtime_error("Inconsistent state of non-overlapping PQS list.");
       }
       while (!it->second.empty()) {
-        best_pqs = it->second.back();
+        best_pqs = it->second.front();
         res.save_pqs(it->first, best_pqs.s, best_pqs.e, best_pqs.f, ref, strand);
+        it->second.pop_front();
         
-        while (true) {
-          // remove all overlapping PQS with lower score
-          // Rcout << "Removing from list " << it->first << endl;
-          list<range> &list = it->second;
-          while (!list.empty() &&
-                 ((list.back().s <= best_pqs.s && best_pqs.s < list.back().e) ||
-                 (best_pqs.s <= list.back().s && list.back().s < best_pqs.e)))  {
-            list.pop_back();
-          }
-          if (it == st.begin()) {
-            // the end of iteration
-            if (list.empty())
-              st.erase(it);
-            break;
-          }
-          else if (list.empty()) {
-            // delete empty list from storage
-            temp = it; // erase operation invalidates iterator
-            --it;
-            st.erase(temp);
-          }
-          else {
-            --it;
+        if (it != st.begin()) {
+          r_it = std::prev(it); // set score level to the next lower level
+          
+          while (true) {
+            // remove all overlapping PQS with lower score
+            list<range> &l = r_it->second;
+            list<range>::iterator l_it = l.begin(), l_temp;
+            
+            while (l_it != l.end()) {
+              if ((l_it->s <= best_pqs.s && best_pqs.s < l_it->e) ||
+                  (best_pqs.s <= l_it->s && l_it->s < best_pqs.e)) {
+                l_temp = l_it; // erase operation invalidates iterator
+                ++l_it;
+                l.erase(l_temp);
+              } else {
+                ++l_it;
+              }
+            }
+            if (r_it == st.begin()) {
+              // the end of iteration
+              if (l.empty()) {
+                st.erase(r_it); // erase empty score level
+              }
+              break;
+            } else if (l.empty()) {
+              // delete empty score level from storage and move on lower score level
+              temp = r_it; // erase operation invalidates iterator
+              --r_it;
+              st.erase(temp);
+            }
+            else {
+              // just move on lower score level
+              --r_it;
+            }
           }
         }
       }
+      st.erase(it); // erase empty score level
     }
   }
   inline void print() {
