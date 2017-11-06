@@ -1,0 +1,24 @@
+citHeader("To cite the 'pqsfinder' package in publications use:")
+
+citEntry(
+	entry="Article",
+	title = "pqsfinder: an exhaustive and imperfection-tolerant search tool for potential quadruplex-forming sequences in R",
+	author = personList(
+		person("Jiri", "Hon"),
+		person("Tomas", "Martinek"),
+		person("Jaroslav", "Zendulka"),
+		person("Matej", "Lexa")
+	),
+	doi = "10.1093/bioinformatics/btx413",
+	journal = "Bioinformatics",
+	year = "2017",
+	volume = "33",
+	number = "21",
+	pages = "3373–3379",
+	
+	textVersion = paste(
+		"Hon J, Martinek T, Zendulka J, Lexa M. (2017)",
+		"pqsfinder: an exhaustive and imperfection-tolerant search tool for potential quadruplex-forming sequences in R.",
+		"Bioinformatics. 33(21), 3373–3379.",
+		"https://doi.org/10.1093/bioinformatics/btx413")
+)
