@@ -14,11 +14,11 @@ citEntry(
 	year = "2017",
 	volume = "33",
 	number = "21",
-	pages = "3373–3379",
+	pages = "3373-3379",
 	
 	textVersion = paste(
 		"Hon J, Martinek T, Zendulka J, Lexa M. (2017)",
 		"pqsfinder: an exhaustive and imperfection-tolerant search tool for potential quadruplex-forming sequences in R.",
-		"Bioinformatics. 33(21), 3373–3379.",
+		"Bioinformatics. 33(21), 3373-3379.",
 		"https://doi.org/10.1093/bioinformatics/btx413")
 )
