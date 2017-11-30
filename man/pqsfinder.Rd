@@ -75,7 +75,7 @@ scoring function is evaluated on every PQS.}
 \item{use_default_scoring}{Enables default internal scoring system. This
 option is particularly useful in case you intend to radically change the
 default behavior and specify your own scoring function. By disabling the
-default scoring you will get a full control above the underlying detection
+default scoring you will get full control over the underlying detection
 algorithm.}
 
 \item{verbose}{Enables detailed output. Turn it on if you want to see all
