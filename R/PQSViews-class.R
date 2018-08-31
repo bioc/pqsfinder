@@ -56,6 +56,9 @@
 #' @param nt Tetrad numbers.
 #' @param nb Bulge counts.
 #' @param nm Mismatch counts.
+#' @param rl1 Run 1 lengths.
+#' @param rl2 Run 2 lengths.
+#' @param rl3 Run 3 lengths.
 #' @param ll1 Loop 1 lengths.
 #' @param ll2 Loop 2 lengths.
 #' @param ll3 Loop 3 lengths.
@@ -74,15 +77,16 @@
 #'
 PQSViews <- function(
   subject, start, width, strand, score, density, max_scores,
-  nt, nb, nm, ll1, ll2, ll3)
+  nt, nb, nm, rl1, rl2, rl3, ll1, ll2, ll3)
 {
   ix <- order(start)
   .PQSViews(
     subject = subject, ranges = IRanges(start = start[ix], width = width[ix]),
     elementMetadata = DataFrame(
       strand = strand[ix], score = score[ix], nt = nt[ix],
-      nb = nb[ix], nm = nm[ix], ll1 = ll1[ix],
-      ll2 = ll2[ix], ll3 = ll3[ix]
+      nb = nb[ix], nm = nm[ix],
+      rl1 = rl1[ix], rl2 = rl2[ix], rl3 = rl3[ix],
+      ll1 = ll1[ix], ll2 = ll2[ix], ll3 = ll3[ix]
     ),
     density = density, max_scores = max_scores
   )
@@ -240,6 +244,9 @@ setMethod('maxScores', 'PQSViews', function(x) x@max_scores)
 .get_nt <- function(pv) elementMetadata(pv)$nt
 .get_nb <- function(pv) elementMetadata(pv)$nb
 .get_nm <- function(pv) elementMetadata(pv)$nm
+.get_rl1 <- function(pv) elementMetadata(pv)$rl1
+.get_rl2 <- function(pv) elementMetadata(pv)$rl2
+.get_rl3 <- function(pv) elementMetadata(pv)$rl3
 .get_ll1 <- function(pv) elementMetadata(pv)$ll1
 .get_ll2 <- function(pv) elementMetadata(pv)$ll2
 .get_ll3 <- function(pv) elementMetadata(pv)$ll3
@@ -343,6 +350,9 @@ setAs("PQSViews", "DNAStringSet", function(from)
       "nt=", .get_nt(from)[i], ";",
       "nb=", .get_nb(from)[i], ";",
       "nm=", .get_nm(from)[i], ";",
+      "rl1=", .get_rl1(from)[i], ";",
+      "rl2=", .get_rl2(from)[i], ";",
+      "rl3=", .get_rl3(from)[i], ";",
       "ll1=", .get_ll1(from)[i], ";",
       "ll2=", .get_ll2(from)[i], ";",
       "ll3=", .get_ll3(from)[i], ";",
@@ -373,6 +383,9 @@ setAs("PQSViews", "GRanges", function(from)
     nt = .get_nt(from),
     nb = .get_nb(from),
     nm = .get_nm(from),
+    rl1 = .get_rl1(from),
+    rl2 = .get_rl2(from),
+    rl3 = .get_rl3(from),
     ll1 = .get_ll1(from),
     ll2 = .get_ll2(from),
     ll3 = .get_ll3(from),

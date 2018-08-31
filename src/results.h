@@ -25,6 +25,9 @@ public:
   vector<int> nt;
   vector<int> nb;
   vector<int> nm;
+  vector<int> rl1;
+  vector<int> rl2;
+  vector<int> rl3;
   vector<int> ll1;
   vector<int> ll2;
   vector<int> ll3;
@@ -67,6 +70,9 @@ public:
       this->nt.push_back(f.nt);
       this->nb.push_back(f.nb);
       this->nm.push_back(f.nm);
+      this->rl1.push_back(f.rl1);
+      this->rl2.push_back(f.rl2);
+      this->rl3.push_back(f.rl3);
       this->ll1.push_back(f.ll1);
       this->ll2.push_back(f.ll2);
       this->ll3.push_back(f.ll3);

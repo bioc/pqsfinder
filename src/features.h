@@ -13,6 +13,9 @@ typedef struct features {
   char nt;
   char nb;
   char nm;
+  char rl1;
+  char rl2;
+  char rl3;
   char ll1;
   char ll2;
   char ll3;

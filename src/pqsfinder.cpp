@@ -255,6 +255,11 @@ inline int score_pqs(
   if (score <= 0) {
     return 0;
   }
+  
+  f.rl1 = w[0];
+  f.rl2 = w[1];
+  f.rl3 = w[2];
+  
   // update reported loop lengths
   f.ll1 = l[0];
   f.ll2 = l[1];
@@ -895,6 +900,9 @@ SEXP pqsfinder(
   IntegerVector res_nt(res.nt.begin(), res.nt.end());
   IntegerVector res_nb(res.nb.begin(), res.nb.end());
   IntegerVector res_nm(res.nm.begin(), res.nm.end());
+  IntegerVector res_rl1(res.rl1.begin(), res.rl1.end());
+  IntegerVector res_rl2(res.rl2.begin(), res.rl2.end());
+  IntegerVector res_rl3(res.rl3.begin(), res.rl3.end());
   IntegerVector res_ll1(res.ll1.begin(), res.ll1.end());
   IntegerVector res_ll2(res.ll2.begin(), res.ll2.end());
   IntegerVector res_ll3(res.ll3.begin(), res.ll3.end());
@@ -909,5 +917,7 @@ SEXP pqsfinder(
   return pqsviews(
     subject, res_start, res_width, res_strand, res_score,
     res_density, res_max_scores,
-    res_nt, res_nb, res_nm, res_ll1, res_ll2, res_ll3);
+    res_nt, res_nb, res_nm,
+    res_rl1, res_rl2, res_rl3,
+    res_ll1, res_ll2, res_ll3);
 }

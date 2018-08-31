@@ -47,3 +47,53 @@ test_that("the result on test seq is the same as gives pqsfinder-1.4.4-patched",
   pv_i <- pv_d[start(pv_d) %in% start(pqsfinder_1_4_4_patched_d)]
   expect_equal_pv_coords(pv_i, pqsfinder_1_4_4_patched_d)
 })
+
+test_that("sequences pqs parts can be extracted", {
+  
+  library(stringr)
+  
+  test_seq <- DNAString("GGGTAGTGGTTTTGGGTTTGGGAAAAAAAAAAAAAAGGGTTTGGAGGAAATTTGGGGAGGGG")
+  pv <- pqsfinder(test_seq, strand = "+")
+  pv_m <- elementMetadata(pv)
+  
+  r1_s <- start(pv)
+  r1_e <- r1_s + pv_m$rl1
+  
+  l1_s <- r1_e
+  l1_e <- l1_s + pv_m$ll1
+  
+  r2_s <- l1_e
+  r2_e <- r2_s + pv_m$rl2
+  
+  l2_s <- r2_e
+  l2_e <- l2_s + pv_m$ll2
+  
+  r3_s <- l2_e
+  r3_e <- r3_s + pv_m$rl3
+  
+  l3_s <- r3_e
+  l3_e <- l3_s + pv_m$ll3
+  
+  r4_s <- l3_e
+  r4_e <- end(pv)
+  
+  # apply end point corrections
+  r1_e <- r1_e - 1
+  l1_e <- l1_e - 1
+  r2_e <- r2_e - 1
+  l2_e <- l2_e - 1
+  r3_e <- r3_e - 1
+  l3_e <- l3_e - 1
+  
+  r1 <- str_sub(test_seq, r1_s, r1_e)
+  l1 <- str_sub(test_seq, l1_s, l1_e)
+  r2 <- str_sub(test_seq, r2_s, r2_e)
+  l2 <- str_sub(test_seq, l2_s, l2_e)
+  r3 <- str_sub(test_seq, r3_s, r3_e)
+  l3 <- str_sub(test_seq, l3_s, l3_e)
+  r4 <- str_sub(test_seq, r4_s, r4_e)
+  
+  pqs_seqs = sprintf("[%s]%s[%s]%s[%s]%s[%s]", r1, l1, r2, l2, r3, l3, r4)
+  
+  expect_equal(nchar(pqs_seqs), width(pv) + 8)
+})
