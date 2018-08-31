@@ -4,8 +4,8 @@
 \alias{PQSViews}
 \title{PQSViews class constructor}
 \usage{
-PQSViews(subject, start, width, strand, score, density, max_scores, nt, nb, nm,
-  ll1, ll2, ll3)
+PQSViews(subject, start, width, strand, score, density, max_scores, nt, nb,
+  nm, rl1, rl2, rl3, ll1, ll2, ll3)
 }
 \arguments{
 \item{subject}{DNAString object.}
@@ -28,6 +28,12 @@ PQSViews(subject, start, width, strand, score, density, max_scores, nt, nb, nm,
 
 \item{nm}{Mismatch counts.}
 
+\item{rl1}{Run 1 lengths.}
+
+\item{rl2}{Run 2 lengths.}
+
+\item{rl3}{Run 3 lengths.}
+
 \item{ll1}{Loop 1 lengths.}
 
 \item{ll2}{Loop 2 lengths.}
@@ -48,8 +54,8 @@ Use \code{\link{elementMetadata}} function to get extra PQS features
 like number of tetrads, bulges, mismatches or loop lengths.
 }
 \examples{
-pv <- PQSViews(DNAString("CGGGCGGGGC"), c(1,2), c(2,3), c("+", "+"),
-               c(10,11), 1:10, 1:10, 0, 0, 0, 1, 1, 1)
+pv <- PQSViews(DNAString("GGTGGTGGTGG"), 1, 11, "+", 33, as.integer(rep(1, 11)),
+               as.integer(rep(33, 11)), 2, 0, 0, 2, 2, 2, 1, 1, 1)
 start(pv)
 width(pv)
 strand(pv)

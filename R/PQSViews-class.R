@@ -65,8 +65,8 @@
 #' @return PQSViews object.
 #'
 #' @examples
-#' pv <- PQSViews(DNAString("CGGGCGGGGC"), c(1,2), c(2,3), c("+", "+"),
-#'                c(10,11), 1:10, 1:10, 0, 0, 0, 1, 1, 1)
+#' pv <- PQSViews(DNAString("GGTGGTGGTGG"), 1, 11, "+", 33, as.integer(rep(1, 11)),
+#'                as.integer(rep(33, 11)), 2, 0, 0, 2, 2, 2, 1, 1, 1)
 #' start(pv)
 #' width(pv)
 #' strand(pv)
