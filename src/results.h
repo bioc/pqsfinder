@@ -78,6 +78,22 @@ public:
       this->ll3.push_back(f.ll3);
     }
   }
+  inline void save_pqs(const results &res, const int i)
+  {
+    this->start.push_back(res.start[i]);
+    this->len.push_back(res.len[i]);
+    this->score.push_back(res.score[i]);
+    this->strand.push_back(res.strand[i]);
+    this->nt.push_back(res.nt[i]);
+    this->nb.push_back(res.nb[i]);
+    this->nm.push_back(res.nm[i]);
+    this->rl1.push_back(res.rl1[i]);
+    this->rl2.push_back(res.rl2[i]);
+    this->rl3.push_back(res.rl3[i]);
+    this->ll1.push_back(res.ll1[i]);
+    this->ll2.push_back(res.ll2[i]);
+    this->ll3.push_back(res.ll3[i]);
+  }
   inline void save_density_and_max_scores(
       const string::const_iterator &s, const string::const_iterator &ref,
       const string &strand, const int *density, const int *max_scores, const int max_len)

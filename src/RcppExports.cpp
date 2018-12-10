@@ -6,8 +6,8 @@
 using namespace Rcpp;
 
 // pqsfinder
-SEXP pqsfinder(SEXP subject, std::string strand, bool overlapping, int max_len, int min_score, int run_min_len, int run_max_len, int loop_min_len, int loop_max_len, int max_bulges, int max_mismatches, int max_defects, int tetrad_bonus, int mismatch_penalty, int bulge_penalty, double bulge_len_factor, double bulge_len_exponent, double loop_mean_factor, double loop_mean_exponent, std::string run_re, SEXP custom_scoring_fn, bool use_default_scoring, bool verbose);
-RcppExport SEXP _pqsfinder_pqsfinder(SEXP subjectSEXP, SEXP strandSEXP, SEXP overlappingSEXP, SEXP max_lenSEXP, SEXP min_scoreSEXP, SEXP run_min_lenSEXP, SEXP run_max_lenSEXP, SEXP loop_min_lenSEXP, SEXP loop_max_lenSEXP, SEXP max_bulgesSEXP, SEXP max_mismatchesSEXP, SEXP max_defectsSEXP, SEXP tetrad_bonusSEXP, SEXP mismatch_penaltySEXP, SEXP bulge_penaltySEXP, SEXP bulge_len_factorSEXP, SEXP bulge_len_exponentSEXP, SEXP loop_mean_factorSEXP, SEXP loop_mean_exponentSEXP, SEXP run_reSEXP, SEXP custom_scoring_fnSEXP, SEXP use_default_scoringSEXP, SEXP verboseSEXP) {
+SEXP pqsfinder(SEXP subject, std::string strand, bool overlapping, int max_len, int min_score, int run_min_len, int run_max_len, int loop_min_len, int loop_max_len, int max_bulges, int max_mismatches, int max_defects, int tetrad_bonus, int mismatch_penalty, int bulge_penalty, double bulge_len_factor, double bulge_len_exponent, double loop_mean_factor, double loop_mean_exponent, std::string run_re, SEXP custom_scoring_fn, bool use_default_scoring, bool fast, bool prescan, bool verbose);
+RcppExport SEXP _pqsfinder_pqsfinder(SEXP subjectSEXP, SEXP strandSEXP, SEXP overlappingSEXP, SEXP max_lenSEXP, SEXP min_scoreSEXP, SEXP run_min_lenSEXP, SEXP run_max_lenSEXP, SEXP loop_min_lenSEXP, SEXP loop_max_lenSEXP, SEXP max_bulgesSEXP, SEXP max_mismatchesSEXP, SEXP max_defectsSEXP, SEXP tetrad_bonusSEXP, SEXP mismatch_penaltySEXP, SEXP bulge_penaltySEXP, SEXP bulge_len_factorSEXP, SEXP bulge_len_exponentSEXP, SEXP loop_mean_factorSEXP, SEXP loop_mean_exponentSEXP, SEXP run_reSEXP, SEXP custom_scoring_fnSEXP, SEXP use_default_scoringSEXP, SEXP fastSEXP, SEXP prescanSEXP, SEXP verboseSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -33,14 +33,16 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< std::string >::type run_re(run_reSEXP);
     Rcpp::traits::input_parameter< SEXP >::type custom_scoring_fn(custom_scoring_fnSEXP);
     Rcpp::traits::input_parameter< bool >::type use_default_scoring(use_default_scoringSEXP);
+    Rcpp::traits::input_parameter< bool >::type fast(fastSEXP);
+    Rcpp::traits::input_parameter< bool >::type prescan(prescanSEXP);
     Rcpp::traits::input_parameter< bool >::type verbose(verboseSEXP);
-    rcpp_result_gen = Rcpp::wrap(pqsfinder(subject, strand, overlapping, max_len, min_score, run_min_len, run_max_len, loop_min_len, loop_max_len, max_bulges, max_mismatches, max_defects, tetrad_bonus, mismatch_penalty, bulge_penalty, bulge_len_factor, bulge_len_exponent, loop_mean_factor, loop_mean_exponent, run_re, custom_scoring_fn, use_default_scoring, verbose));
+    rcpp_result_gen = Rcpp::wrap(pqsfinder(subject, strand, overlapping, max_len, min_score, run_min_len, run_max_len, loop_min_len, loop_max_len, max_bulges, max_mismatches, max_defects, tetrad_bonus, mismatch_penalty, bulge_penalty, bulge_len_factor, bulge_len_exponent, loop_mean_factor, loop_mean_exponent, run_re, custom_scoring_fn, use_default_scoring, fast, prescan, verbose));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_pqsfinder_pqsfinder", (DL_FUNC) &_pqsfinder_pqsfinder, 23},
+    {"_pqsfinder_pqsfinder", (DL_FUNC) &_pqsfinder_pqsfinder, 25},
     {NULL, NULL, 0}
 };
 

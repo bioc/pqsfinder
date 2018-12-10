@@ -76,6 +76,8 @@ typedef struct flags {
   bool verbose;
   bool debug;
   bool use_default_scoring;
+  bool fast;
+  bool prescan;
 } flags_t;
 
 typedef struct opts {
@@ -94,6 +96,7 @@ class run_match {
 public:
   string::const_iterator first;
   string::const_iterator second;
+  int g_count;
   int length() const {
     return second - first;
   };
@@ -113,6 +116,18 @@ inline void print_pqs(const run_match m[], int score, const string::const_iterat
   for (int i = 1; i < RUN_CNT; i++)
     Rcout << string(m[i-1].second, m[i].first) << "[" << string(m[i].first, m[i].second) << "]";
   Rcout << " " << score << endl;
+}
+
+
+/**
+ * Print partial quadruplex
+ * 
+ */
+inline void print_partial_pqs(const run_match m[], int i, const string::const_iterator ref) {
+  Rcout << m[0].first - ref + 1 << "-" << m[i].second - ref << " " << "[" << string(m[0].first, m[0].second) << "]";
+  for (int k = 1; k <= i; k++)
+    Rcout << string(m[k-1].second, m[k].first) << "[" << string(m[k].first, m[k].second) << "]";
+  Rcout << endl;
 }
 
 
@@ -404,6 +419,10 @@ inline bool find_run(
     }
     m.first = s;
     m.second = ++e; // correction to point on the past-the-end character
+    
+    if (flags.fast) {
+      m.g_count = count_g_num(m);
+    }
     return true;
   }
 }
@@ -476,12 +495,21 @@ void find_all_runs(
     int &pqs_cnt,
     results &res,
     bool zero_loop,
-    chrono::system_clock::time_point s_time)
+    chrono::system_clock::time_point s_time,
+    int min_g_count,
+    int min_run_len,
+    int defect_count,
+    int &fn_call_count)
 {
   string::const_iterator s, e, min_e;
   int score, loop_len;
   pqs_cache::entry *cache_hit;
   bool found_any;
+  int next_min_g_count;
+  int next_min_run_len;
+  int next_defect_count;
+  
+  fn_call_count++;
 
   if (i > 0) {
     loop_len = start - m[i-1].second;
@@ -530,12 +558,59 @@ void find_all_runs(
       s = string::const_iterator(m[i].first);
       e = string::const_iterator(m[i].second);
       
+      next_min_g_count = min(min_g_count, m[i].g_count);
+      next_min_run_len = min(min_run_len, m[i].length());
+      next_defect_count = defect_count + (m[i].length() != m[i].g_count);
+      
+      if (flags.prescan && i == 0) {
+        int max_total_g_count = 0;
+        string::const_iterator pqs_max_end = min(s + opts.max_len, end);
+        
+        for (string::const_iterator temp_s = s; temp_s < pqs_max_end; ++temp_s) {
+          if (*temp_s == 'G') {
+            ++max_total_g_count;
+          }
+        }
+        int max_tetrads = max_total_g_count / 4;
+        if (flags.verbose) {
+          Rcout << "-------" << endl << "max_tetrads: " << max_tetrads << endl;
+        }
+        next_min_g_count = min(next_min_g_count, max_tetrads);
+      }
+      
+      int next_min_tetrads;
+      if (next_min_run_len == next_min_g_count + 1) {
+        // correction for mismatch
+        next_min_tetrads = next_min_g_count + 1;
+      } else {
+        next_min_tetrads = next_min_g_count;
+      }
+      
+      int max_score = (next_min_tetrads - 1) * sc.tetrad_bonus
+        - next_defect_count * min(sc.bulge_penalty, sc.mismatch_penalty);
+      
+      if (flags.verbose) {
+        print_partial_pqs(m, i, ref);
+        Rcout << "next_min_tetrads: " << next_min_tetrads 
+              << " next_defect_count: " << next_defect_count
+              << " max_scores[0]: " << res.max_scores[m[0].first - ref]
+              << " max_score: " << max_score
+              << endl;
+      }
+      
+      if (flags.fast && i < 3 && res.max_scores[m[0].first - ref] > 0 && max_score <= res.max_scores[m[0].first - ref]) {
+        if (flags.verbose) {
+          Rcout << "Skip search branch..." << endl;
+        }
+        continue;
+      }
+      
       if (i == 0) {
         // enforce G4 total length limit to be relative to the first G-run start
         find_all_runs(
           subject, strand, i+1, e, min(s + opts.max_len, end), m, run_re_c, opts,
           flags, sc, ref, len, pqs_storage, ctable, cache_entry, pqs_cnt, res,
-          false, s_time
+          false, s_time, next_min_g_count, next_min_run_len, next_defect_count, fn_call_count
         );
       } else if (i < 3) {
         loop_len = s - m[i-1].second;
@@ -545,7 +620,7 @@ void find_all_runs(
         find_all_runs(
           subject, strand, i+1, e, end, m, run_re_c, opts, flags, sc, ref, len,
           pqs_storage, ctable, cache_entry, pqs_cnt, res,
-          (loop_len == 0 ? true : zero_loop), s_time
+          (loop_len == 0 ? true : zero_loop), s_time, next_min_g_count, next_min_run_len, next_defect_count, fn_call_count
         );
       } else {
         /* Check user interrupt after reasonable amount of PQS identified to react
@@ -581,8 +656,11 @@ void find_all_runs(
         if (score) {
           int pqs_len = m[3].second - m[0].first;
           
+          int offset = m[0].first - ref; // for + strand only
+          
           for (int k = 0; k < pqs_len; ++k) {
             cache_entry.max_scores[k] = max(cache_entry.max_scores[k], score);
+            res.max_scores[offset + k] = max(res.max_scores[offset + k], score);
           }
           if (score >= opts.min_score) {
             // current PQS satisfied all constraints
@@ -637,6 +715,86 @@ pqs_storage &select_pqs_storage(
     return nov;
 }
 
+void pqs_search_negative_regions(
+    SEXP subject,
+    const string &seq,
+    const string::const_iterator seq_start,
+    const string::const_iterator seq_end,
+    const string &strand,
+    const boost::regex &run_re_c,
+    pqs_cache &ctable,
+    const scoring &sc,
+    const opts_t &opts,
+    const flags_t &flags,
+    vector<int> res_start,
+    vector<int> res_len,
+    results &res
+)
+{
+  Rcout << "Search negative regions..." << endl;
+  
+  run_match m[RUN_CNT];
+  pqs_cache::entry cache_entry(opts.max_len);
+  int pqs_cnt = 0;
+  pqs_storage_overlapping pqs_storage_ov(seq.begin());
+  pqs_storage_non_overlapping_revised pqs_storage_nov(seq.begin());
+  pqs_storage &pqs_storage = select_pqs_storage(opts.overlapping, pqs_storage_ov, pqs_storage_nov);
+  
+  int fn_call_count = 0;
+  
+  string::const_iterator start = seq_start;
+  string::const_iterator end = seq.begin() + res_start[0] - 1;
+  int i = 0;
+  
+  for (int i = 0; i <= res_start.size(); ++i) {
+    
+    if (end - start > opts.run_min_len * 4) {
+      // search negative region
+      Rcout << "negative region " << start - seq.begin() + 1 << "-" << end - seq.begin() << " res_start.size: " << res_start.size() << endl;
+      
+      results neg_res(seq.length(), opts.min_score);
+      
+      // find_all_runs(
+      //   subject, strand, 0, start, end, m, run_re_c, opts, flags, sc,
+      //   seq.begin(), seq.length(), pqs_storage, ctable,
+      //   cache_entry, pqs_cnt, neg_res, false, chrono::system_clock::now(), INT_MAX, INT_MAX, 0, fn_call_count
+      // );
+      // pqs_storage.export_pqs(neg_res, seq.begin(), strand);
+      
+      if (!neg_res.start.empty()) {
+        Rcout << "found " << neg_res.start.size() << " hits in negative region" << endl;
+        // run again
+        pqs_search_negative_regions(
+          subject,
+          seq,
+          start,
+          end,
+          strand,
+          run_re_c,
+          ctable,
+          sc,
+          opts,
+          flags,
+          vector<int>(neg_res.start),
+          vector<int>(neg_res.len),
+          res
+        );
+        // copy results to new results
+        for (int i = 0; i < neg_res.start.size(); ++i) {
+          res.save_pqs(neg_res, i);
+        }
+      }
+    }
+    start = seq.begin() + res_start[i] + res_len[i] - 1;
+    if (i == res_start.size() - 1) {
+      end = seq_end;
+    } else {
+      end = seq.begin() + res_start[i+1] - 1;
+    }
+  }
+  Rcout << "fn_call_count: " << fn_call_count << endl;
+}
+
 /**
  * Perform quadruplex search on given DNA sequence.
  *
@@ -668,13 +826,68 @@ void pqs_search(
   pqs_storage_non_overlapping_revised pqs_storage_nov(seq.begin());
   pqs_storage &pqs_storage = select_pqs_storage(opts.overlapping, pqs_storage_ov, pqs_storage_nov);
   
+  int fn_call_count = 0;
+  
+  // if (flags.prescan) {
+  //   boost::regex pqs_re_c("(G{2,11}).{1,10}?(\\1).{1,10}?(\\1).{1,10}?(\\1)");
+  //   boost::smatch boost_m;
+  //   string::const_iterator s = seq.begin();
+  //   int score;
+  // 
+  //   while (run_regex_search(s, seq.end(), boost_m, pqs_re_c)) {
+  //     for (int i = 0; i < RUN_CNT; ++i) {
+  //       m[i].first = boost_m[i+1].first;
+  //       m[i].second = boost_m[i+1].second;
+  //     }
+  //     features_t pqs_features;
+  //     score = score_pqs(m, pqs_features, sc, opts);
+  // 
+  //     int pqs_len = m[3].second - m[0].first;
+  //     int offset = m[0].first - seq.begin(); // for + strand only
+  // 
+  //     for (int k = 0; k < pqs_len; ++k) {
+  //       res.max_scores[offset + k] = score;
+  //     }
+  //     if (flags.verbose) {
+  //       Rcout << "prescanned PQS" << endl;
+  //       print_pqs(m, score, seq.begin());
+  //     }
+  //     s = boost_m[0].second;
+  //   }
+  // }
+  
   // Global sequence length is the only limit for the first G-run
   find_all_runs(
     subject, strand, 0, seq.begin(), seq.end(), m, run_re_c, opts, flags, sc,
     seq.begin(), seq.length(), pqs_storage, ctable,
-    cache_entry, pqs_cnt, res, false, chrono::system_clock::now()
+    cache_entry, pqs_cnt, res, false, chrono::system_clock::now(), INT_MAX, INT_MAX, 0, fn_call_count
   );
   pqs_storage.export_pqs(res, seq.begin(), strand);
+  
+  Rcout << "first_fn_call_count: " << fn_call_count << endl;
+  
+  vector<int> res_start(res.start);
+  vector<int> res_len(res.len);
+  results new_res(seq.length(), opts.min_score);
+  
+  pqs_search_negative_regions(
+    subject,
+    seq,
+    seq.begin(),
+    seq.end(),
+    strand,
+    run_re_c,
+    ctable,
+    sc,
+    opts,
+    flags,
+    res_start,
+    res_len,
+    res
+  );// copy results to global results
+  for (int i = 0; i < new_res.start.size(); ++i) {
+    res.save_pqs(new_res, i);
+  }
 }
 
 
@@ -729,6 +942,9 @@ void pqs_search(
 //'   default behavior and specify your own scoring function. By disabling the
 //'   default scoring you will get a full control above the underlying detection
 //'   algorithm.
+//' @param fast Enable fast searching. This has some impact on maxScores and
+//'   density vectors.
+//' @param prescan Prescan string by regular expression to get quick score estimates
 //' @param verbose Enables detailed output. Turn it on if you want to see all
 //'   possible PQS found at each positions and not just the best one. It is
 //'   highly recommended to use this option for debugging custom quadruplex
@@ -768,6 +984,8 @@ SEXP pqsfinder(
     std::string run_re = "G{1,10}.{0,9}G{1,10}",
     SEXP custom_scoring_fn = R_NilValue,
     bool use_default_scoring = true,
+    bool fast = true,
+    bool prescan = true,
     bool verbose = false)
 {
   if (max_len < 1)
@@ -814,6 +1032,8 @@ SEXP pqsfinder(
   flags.debug = false;
   flags.verbose = verbose;
   flags.use_default_scoring = use_default_scoring;
+  flags.fast = fast;
+  flags.prescan = prescan;
 
   if (run_re != "G{1,10}.{0,9}G{1,10}") {
     // User specified its own regexp, force to use regexp engine

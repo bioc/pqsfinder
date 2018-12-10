@@ -12,7 +12,8 @@ pqsfinder(subject, strand = "*", overlapping = FALSE, max_len = 50L,
   bulge_len_factor = 0.2, bulge_len_exponent = 1,
   loop_mean_factor = 6.6, loop_mean_exponent = 0.8,
   run_re = "G{1,10}.{0,9}G{1,10}", custom_scoring_fn = NULL,
-  use_default_scoring = TRUE, verbose = FALSE)
+  use_default_scoring = TRUE, fast = TRUE, prescan = TRUE,
+  verbose = FALSE)
 }
 \arguments{
 \item{subject}{DNAString object.}
@@ -78,6 +79,11 @@ option is particularly useful in case you intend to radically change the
 default behavior and specify your own scoring function. By disabling the
 default scoring you will get a full control above the underlying detection
 algorithm.}
+
+\item{fast}{Enable fast searching. This has some impact on maxScores and
+density vectors.}
+
+\item{prescan}{Prescan string by regular expression to get quick score estimates}
 
 \item{verbose}{Enables detailed output. Turn it on if you want to see all
 possible PQS found at each positions and not just the best one. It is
