@@ -69,7 +69,7 @@ public:
   }
 };
 
-typedef struct flags {
+struct flags_t {
   bool use_cache;
   bool use_re;
   bool use_prof;
@@ -78,9 +78,9 @@ typedef struct flags {
   bool use_default_scoring;
   bool fast;
   bool prescan;
-} flags_t;
+};
 
-typedef struct opts {
+struct opts_t {
   bool overlapping;
   int max_len;
   int min_score;
@@ -89,7 +89,7 @@ typedef struct opts {
   int loop_min_len;
   int loop_max_len;
   int check_int_period;
-} opts_t;
+};
 
 // Class representing one run from quadruplex
 class run_match {
@@ -726,12 +726,12 @@ void pqs_search_negative_regions(
     const scoring &sc,
     const opts_t &opts,
     const flags_t &flags,
-    vector<int> res_start,
-    vector<int> res_len,
-    results &res
+    vector<results::item_t> res_items,
+    results &res,
+    int &fn_call_count
 )
 {
-  Rcout << "Search negative regions..." << endl;
+  // Rcout << "Search negative regions..." << endl;
   
   run_match m[RUN_CNT];
   pqs_cache::entry cache_entry(opts.max_len);
@@ -740,29 +740,29 @@ void pqs_search_negative_regions(
   pqs_storage_non_overlapping_revised pqs_storage_nov(seq.begin());
   pqs_storage &pqs_storage = select_pqs_storage(opts.overlapping, pqs_storage_ov, pqs_storage_nov);
   
-  int fn_call_count = 0;
-  
   string::const_iterator start = seq_start;
-  string::const_iterator end = seq.begin() + res_start[0] - 1;
+  string::const_iterator end = seq.begin() + res_items[0].start - 1;
   int i = 0;
   
-  for (int i = 0; i <= res_start.size(); ++i) {
+  for (int i = 0; i <= res_items.size(); ++i) {
     
     if (end - start > opts.run_min_len * 4) {
       // search negative region
-      Rcout << "negative region " << start - seq.begin() + 1 << "-" << end - seq.begin() << " res_start.size: " << res_start.size() << endl;
+      // Rcout << "negative region " << start - seq.begin() + 1 << "-" << end - seq.begin() << " res_items.size: " << res_items.size() << endl;
       
       results neg_res(seq.length(), opts.min_score);
       
-      // find_all_runs(
-      //   subject, strand, 0, start, end, m, run_re_c, opts, flags, sc,
-      //   seq.begin(), seq.length(), pqs_storage, ctable,
-      //   cache_entry, pqs_cnt, neg_res, false, chrono::system_clock::now(), INT_MAX, INT_MAX, 0, fn_call_count
-      // );
-      // pqs_storage.export_pqs(neg_res, seq.begin(), strand);
+      find_all_runs(
+        subject, strand, 0, start, end, m, run_re_c, opts, flags, sc, 
+        seq.begin(), seq.length(), pqs_storage, ctable,
+        cache_entry, pqs_cnt, neg_res, false, chrono::system_clock::now(),
+        INT_MAX, INT_MAX, 0, fn_call_count
+      );
+      pqs_storage.export_pqs(neg_res, seq.begin(), strand);
       
-      if (!neg_res.start.empty()) {
-        Rcout << "found " << neg_res.start.size() << " hits in negative region" << endl;
+      if (!neg_res.items.empty()) {
+        // Rcout << "found " << neg_res.items.size() << " hits in negative region" << endl;
+        
         // run again
         pqs_search_negative_regions(
           subject,
@@ -775,24 +775,28 @@ void pqs_search_negative_regions(
           sc,
           opts,
           flags,
-          vector<int>(neg_res.start),
-          vector<int>(neg_res.len),
-          res
+          vector<results::item_t>(neg_res.items),
+          res,
+          fn_call_count
         );
         // copy results to new results
-        for (int i = 0; i < neg_res.start.size(); ++i) {
-          res.save_pqs(neg_res, i);
+        for (int i = 0; i < neg_res.items.size(); ++i) {
+          res.items.push_back(neg_res.items[i]);
         }
       }
     }
-    start = seq.begin() + res_start[i] + res_len[i] - 1;
-    if (i == res_start.size() - 1) {
+    start = seq.begin() + res_items[i].start + res_items[i].len - 1;
+    if (i == res_items.size() - 1) {
       end = seq_end;
     } else {
-      end = seq.begin() + res_start[i+1] - 1;
+      end = seq.begin() + res_items[i+1].start - 1;
     }
   }
-  Rcout << "fn_call_count: " << fn_call_count << endl;
+  // Rcout << "fn_call_count: " << fn_call_count << endl;
+}
+
+bool cmp_res_item_by_start(const results::item_t &a, const results::item_t &b) {
+  return a.start < b.start;
 }
 
 /**
@@ -866,27 +870,32 @@ void pqs_search(
   
   Rcout << "first_fn_call_count: " << fn_call_count << endl;
   
-  vector<int> res_start(res.start);
-  vector<int> res_len(res.len);
-  results new_res(seq.length(), opts.min_score);
-  
-  pqs_search_negative_regions(
-    subject,
-    seq,
-    seq.begin(),
-    seq.end(),
-    strand,
-    run_re_c,
-    ctable,
-    sc,
-    opts,
-    flags,
-    res_start,
-    res_len,
-    res
-  );// copy results to global results
-  for (int i = 0; i < new_res.start.size(); ++i) {
-    res.save_pqs(new_res, i);
+  if (flags.fast && !res.items.empty()) {
+    
+    vector<results::item_t> res_items(res.items);
+    sort(res_items.begin(), res_items.end(), cmp_res_item_by_start);
+    
+    results new_res(seq.length(), opts.min_score);
+    
+    pqs_search_negative_regions(
+      subject,
+      seq,
+      seq.begin(),
+      seq.end(),
+      strand,
+      run_re_c,
+      ctable,
+      sc,
+      opts,
+      flags,
+      res_items,
+      res,
+      fn_call_count
+    );// copy results to global results
+    for (int i = 0; i < new_res.items.size(); ++i) {
+      res.items.push_back(new_res.items[i]);
+    }
+    Rcout << "second_fn_call_count: " << fn_call_count << endl;
   }
 }
 
@@ -1113,19 +1122,35 @@ SEXP pqsfinder(
     ProfilerStop();
   #endif
 
-  IntegerVector res_start(res.start.begin(), res.start.end());
-  IntegerVector res_width(res.len.begin(), res.len.end());
-  IntegerVector res_score(res.score.begin(), res.score.end());
-  CharacterVector res_strand(res.strand.begin(), res.strand.end());
-  IntegerVector res_nt(res.nt.begin(), res.nt.end());
-  IntegerVector res_nb(res.nb.begin(), res.nb.end());
-  IntegerVector res_nm(res.nm.begin(), res.nm.end());
-  IntegerVector res_rl1(res.rl1.begin(), res.rl1.end());
-  IntegerVector res_rl2(res.rl2.begin(), res.rl2.end());
-  IntegerVector res_rl3(res.rl3.begin(), res.rl3.end());
-  IntegerVector res_ll1(res.ll1.begin(), res.ll1.end());
-  IntegerVector res_ll2(res.ll2.begin(), res.ll2.end());
-  IntegerVector res_ll3(res.ll3.begin(), res.ll3.end());
+  IntegerVector res_start(res.items.size());
+  IntegerVector res_width(res.items.size());
+  IntegerVector res_score(res.items.size());
+  CharacterVector res_strand(res.items.size());
+  IntegerVector res_nt(res.items.size());
+  IntegerVector res_nb(res.items.size());
+  IntegerVector res_nm(res.items.size());
+  IntegerVector res_rl1(res.items.size());
+  IntegerVector res_rl2(res.items.size());
+  IntegerVector res_rl3(res.items.size());
+  IntegerVector res_ll1(res.items.size());
+  IntegerVector res_ll2(res.items.size());
+  IntegerVector res_ll3(res.items.size());
+  
+  for (int i = 0; i < res.items.size(); ++i) {
+    res_start[i] = res.items[i].start;
+    res_width[i] = res.items[i].len;
+    res_score[i] = res.items[i].score;
+    res_strand[i] = res.items[i].strand;
+    res_nt[i] = res.items[i].nt;
+    res_nb[i] = res.items[i].nb;
+    res_nm[i] = res.items[i].nm;
+    res_rl1[i] = res.items[i].rl1;
+    res_rl2[i] = res.items[i].rl2;
+    res_rl3[i] = res.items[i].rl3;
+    res_ll1[i] = res.items[i].ll1;
+    res_ll2[i] = res.items[i].ll2;
+    res_ll3[i] = res.items[i].ll3;
+  }
 
   IntegerVector res_density(seq.length());
   IntegerVector res_max_scores(seq.length());

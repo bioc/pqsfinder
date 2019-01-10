@@ -18,19 +18,23 @@ using namespace std;
 
 class results {
 public:
-  vector<int> start;
-  vector<int> len;
-  vector<int> score;
-  vector<string> strand;
-  vector<int> nt;
-  vector<int> nb;
-  vector<int> nm;
-  vector<int> rl1;
-  vector<int> rl2;
-  vector<int> rl3;
-  vector<int> ll1;
-  vector<int> ll2;
-  vector<int> ll3;
+  struct item_t {
+    int start;
+    int len;
+    int score;
+    string strand;
+    int nt;
+    int nb;
+    int nm;
+    int rl1;
+    int rl2;
+    int rl3;
+    int ll1;
+    int ll2;
+    int ll3;
+  };
+  vector<results::item_t> items;
+  
   int *density;
   int *max_scores;
 
@@ -59,40 +63,28 @@ public:
       const string::const_iterator &ref, const string &strand)
   {
     if (score >= this->min_score) {
-      if (strand == "+")
-        this->start.push_back(s - ref + 1); // R indexing starts at 1
-      else
-        this->start.push_back(this->seq_len - (e - ref) + 1);
-
-      this->len.push_back(e - s);
-      this->score.push_back(score);
-      this->strand.push_back(strand);
-      this->nt.push_back(f.nt);
-      this->nb.push_back(f.nb);
-      this->nm.push_back(f.nm);
-      this->rl1.push_back(f.rl1);
-      this->rl2.push_back(f.rl2);
-      this->rl3.push_back(f.rl3);
-      this->ll1.push_back(f.ll1);
-      this->ll2.push_back(f.ll2);
-      this->ll3.push_back(f.ll3);
+      results::item_t item;
+      
+      if (strand == "+") {
+        item.start = s - ref + 1; // R indexing starts at 1
+      } else {
+        item.start = this->seq_len - (e - ref) + 1;
+      }
+      item.len = e - s;
+      item.score = score;
+      item.strand = strand;
+      item.nt = f.nt;
+      item.nb = f.nb;
+      item.nm = f.nm;
+      item.rl1 = f.rl1;
+      item.rl2 = f.rl2;
+      item.rl3 = f.rl3;
+      item.ll1 = f.ll1;
+      item.ll2 = f.ll2;
+      item.ll3 = f.ll3;
+      
+      this->items.push_back(item);
     }
-  }
-  inline void save_pqs(const results &res, const int i)
-  {
-    this->start.push_back(res.start[i]);
-    this->len.push_back(res.len[i]);
-    this->score.push_back(res.score[i]);
-    this->strand.push_back(res.strand[i]);
-    this->nt.push_back(res.nt[i]);
-    this->nb.push_back(res.nb[i]);
-    this->nm.push_back(res.nm[i]);
-    this->rl1.push_back(res.rl1[i]);
-    this->rl2.push_back(res.rl2[i]);
-    this->rl3.push_back(res.rl3[i]);
-    this->ll1.push_back(res.ll1[i]);
-    this->ll2.push_back(res.ll2[i]);
-    this->ll3.push_back(res.ll3[i]);
   }
   inline void save_density_and_max_scores(
       const string::const_iterator &s, const string::const_iterator &ref,
@@ -120,10 +112,10 @@ public:
   }
   inline void print(const string::const_iterator &ref) const {
     Rcout << "Results" << endl;
-    for (unsigned i = 0; i < this->start.size(); i++) {
-      Rcout << "PQS[" << i << "]: " << this->start[i] << " "
-            << string(ref + this->start[i], ref + this->start[i] + this->len[i])
-            << " " << this->score[i] << endl;
+    for (unsigned i = 0; i < this->items.size(); i++) {
+      Rcout << "PQS[" << i << "]: " << this->items[i].start << " "
+            << string(ref + this->items[i].start, ref + this->items[i].start + this->items[i].len)
+            << " " << this->items[i].score << endl;
     }
   }
 };

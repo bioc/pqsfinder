@@ -9,7 +9,7 @@
 #ifndef FEATURES_HEADER
 #define FEATURES_HEADER
 
-typedef struct features {
+struct features_t {
   char nt;
   char nb;
   char nm;
@@ -19,6 +19,6 @@ typedef struct features {
   char ll1;
   char ll2;
   char ll3;
-} features_t;
+};
 
 #endif // FEATURES_HEADER
