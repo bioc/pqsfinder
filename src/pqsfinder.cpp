@@ -396,6 +396,10 @@ inline bool find_run(
       }
       m.first = boost_m[0].first;
       m.second = boost_m[0].second;
+      
+      if (flags.fast) {
+        m.g_count = count_g_num(m);
+      }
       return true;
     } else {
       return false;
