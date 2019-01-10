@@ -799,8 +799,44 @@ void pqs_search_negative_regions(
   // Rcout << "fn_call_count: " << fn_call_count << endl;
 }
 
-bool cmp_res_item_by_start(const results::item_t &a, const results::item_t &b) {
+bool cmp_res_item_by_start(const results::item_t &a, const results::item_t &b)
+{
   return a.start < b.start;
+}
+
+void pqs_prescan(
+    const string &seq,
+    const scoring &sc,
+    const opts_t &opts,
+    const flags_t &flags,
+    results &res)
+{
+  run_match m[RUN_CNT];
+  boost::regex pqs_re_c("(G{2,11}).{1,10}?(\\1).{1,10}?(\\1).{1,10}?(\\1)");
+  boost::smatch boost_m;
+  string::const_iterator s = seq.begin();
+  int score;
+  
+  while (run_regex_search(s, seq.end(), boost_m, pqs_re_c)) {
+    for (int i = 0; i < RUN_CNT; ++i) {
+      m[i].first = boost_m[i+1].first;
+      m[i].second = boost_m[i+1].second;
+    }
+    features_t pqs_features;
+    score = score_pqs(m, pqs_features, sc, opts);
+    
+    int pqs_len = m[3].second - m[0].first;
+    int offset = m[0].first - seq.begin(); // for + strand only
+    
+    for (int k = 0; k < pqs_len; ++k) {
+      res.max_scores[offset + k] = score;
+    }
+    if (flags.verbose) {
+      Rcout << "prescanned PQS" << endl;
+      print_pqs(m, score, seq.begin());
+    }
+    s = boost_m[0].second;
+  }
 }
 
 /**
@@ -836,33 +872,9 @@ void pqs_search(
   
   int fn_call_count = 0;
   
-  // if (flags.prescan) {
-  //   boost::regex pqs_re_c("(G{2,11}).{1,10}?(\\1).{1,10}?(\\1).{1,10}?(\\1)");
-  //   boost::smatch boost_m;
-  //   string::const_iterator s = seq.begin();
-  //   int score;
-  // 
-  //   while (run_regex_search(s, seq.end(), boost_m, pqs_re_c)) {
-  //     for (int i = 0; i < RUN_CNT; ++i) {
-  //       m[i].first = boost_m[i+1].first;
-  //       m[i].second = boost_m[i+1].second;
-  //     }
-  //     features_t pqs_features;
-  //     score = score_pqs(m, pqs_features, sc, opts);
-  // 
-  //     int pqs_len = m[3].second - m[0].first;
-  //     int offset = m[0].first - seq.begin(); // for + strand only
-  // 
-  //     for (int k = 0; k < pqs_len; ++k) {
-  //       res.max_scores[offset + k] = score;
-  //     }
-  //     if (flags.verbose) {
-  //       Rcout << "prescanned PQS" << endl;
-  //       print_pqs(m, score, seq.begin());
-  //     }
-  //     s = boost_m[0].second;
-  //   }
-  // }
+  if (flags.prescan) {
+    pqs_prescan(seq, sc, opts, flags, res);
+  }
   
   // Global sequence length is the only limit for the first G-run
   find_all_runs(
