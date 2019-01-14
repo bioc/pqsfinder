@@ -26,4 +26,5 @@ LinkingTo: Rcpp, BH (>= 1.69.0)
 SystemRequirements: GNU make, C++11
 VignetteBuilder: knitr
 RoxygenNote: 6.1.1
+Encoding: UTF-8
 NeedsCompilation: yes
