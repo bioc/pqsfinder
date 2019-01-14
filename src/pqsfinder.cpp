@@ -497,7 +497,6 @@ void debug_s_e(
  */
 void find_all_runs(
     SEXP subject,
-    const string &strand,
     const int i,
     string::const_iterator start,
     string::const_iterator end,
@@ -553,9 +552,9 @@ void find_all_runs(
                   << " " << cache_hit->score << endl;
 
           res.save_density_and_max_scores(
-            s, ref, strand, cache_hit->density, cache_hit->max_scores, opts.max_len);
+            s, ref, cache_hit->density, cache_hit->max_scores, opts.max_len);
 
-          pqs_storage.insert_pqs(cache_hit->score, s, s + cache_hit->len, cache_hit->f, res, ref, strand);
+          pqs_storage.insert_pqs(cache_hit->score, s, s + cache_hit->len, cache_hit->f, res);
           continue;
         }
       }
@@ -627,7 +626,7 @@ void find_all_runs(
       if (i == 0) {
         // enforce G4 total length limit to be relative to the first G-run start
         find_all_runs(
-          subject, strand, i+1, e, min(s + opts.max_len, end), m, run_re_c, opts,
+          subject, i+1, e, min(s + opts.max_len, end), m, run_re_c, opts,
           flags, sc, ref, len, pqs_storage, ctable, cache_entry, pqs_cnt, res,
           false, s_time, next_min_g_count, next_min_run_len, next_defect_count, fn_call_count
         );
@@ -637,7 +636,7 @@ void find_all_runs(
           return; // skip too long loops
         }
         find_all_runs(
-          subject, strand, i+1, e, end, m, run_re_c, opts, flags, sc, ref, len,
+          subject, i+1, e, end, m, run_re_c, opts, flags, sc, ref, len,
           pqs_storage, ctable, cache_entry, pqs_cnt, res,
           (loop_len == 0 ? true : zero_loop), s_time, next_min_g_count, next_min_run_len, next_defect_count, fn_call_count
         );
@@ -683,7 +682,7 @@ void find_all_runs(
           }
           if (score >= opts.min_score) {
             // current PQS satisfied all constraints
-            pqs_storage.insert_pqs(score, m[0].first, m[3].second, pqs_features, res, ref, strand);
+            pqs_storage.insert_pqs(score, m[0].first, m[3].second, pqs_features, res);
             
             for (int k = 0; k < pqs_len; ++k)
               ++cache_entry.density[k];
@@ -707,7 +706,7 @@ void find_all_runs(
 
       // add locally accumulated max scores to global max scores array
       res.save_density_and_max_scores(
-        s, ref, strand, cache_entry.density, cache_entry.max_scores, opts.max_len);
+        s, ref, cache_entry.density, cache_entry.max_scores, opts.max_len);
     }
     if (!found_any) {
       break;
@@ -737,7 +736,6 @@ pqs_storage &select_pqs_storage(
 void search_overscored_pqs(
     SEXP subject,
     const string &seq,
-    const string &strand,
     const boost::regex &run_re_c,
     pqs_cache &ctable,
     const scoring &sc,
@@ -769,166 +767,62 @@ void search_overscored_pqs(
   
   for (int i = 0; i < res_items.size(); ++i) {
     
-    if (strand == "+") {
-      left_end = seq.begin() + res_items[i].start - 1;
-      right_start = seq.begin() + res_items[i].start + res_items[i].len - 1;
-      
-      if (i == 0) {
-        left_start = max(left_end - opts.max_len, seq.begin());
-      } else {
-        prev_pqs_end = seq.begin() + res_items[i-1].start + res_items[i-1].len - 1;
-        left_start = max(left_end - opts.max_len, prev_pqs_end);
-        if (left_start - prev_pqs_end < 50) {
-          left_start = left_end; // do not search again
-        }
-      }
-      if (i == res_items.size() - 1) {
-        right_end = min(right_start + opts.max_len, seq.end());
-      } else {
-        next_pqs_start = seq.begin() + res_items[i+1].start - 1;
-        right_end = min(right_start + opts.max_len, next_pqs_start);
-        if (next_pqs_start - right_end < opts.max_len) {
-          right_end = next_pqs_start; // extend search region
-        }
-      }
+    left_end = res_items[i].start - 1;
+    right_start = res_items[i].start + res_items[i].len - 1;
+    
+    if (i == 0) {
+      left_start = max(left_end - opts.max_len, seq.begin());
     } else {
-      left_end = seq.end() - (res_items[i].start + res_items[i].len - 1);
-      right_start = seq.end() - res_items[i].start + 1;
-      
-      if (i == res_items.size() - 1) {
-        left_start = max(left_end - opts.max_len, seq.begin());
-      } else {
-        left_start = max(left_end - opts.max_len, seq.end() - res_items[i+1].start + 1);
+      prev_pqs_end = res_items[i-1].start + res_items[i-1].len - 1;
+      left_start = max(left_end - opts.max_len, prev_pqs_end);
+      if (left_start - prev_pqs_end < 50) {
+        left_start = left_end; // do not search again
       }
-      if (i == 0) {
-        right_end = min(right_start + opts.max_len, seq.end());
-      } else {
-        right_end = min(right_start + opts.max_len, seq.end() - (res_items[i+1].start + res_items[i+1].len - 1));
+    }
+    if (i == res_items.size() - 1) {
+      right_end = min(right_start + opts.max_len, seq.end());
+    } else {
+      next_pqs_start = res_items[i+1].start - 1;
+      right_end = min(right_start + opts.max_len, next_pqs_start);
+      if (next_pqs_start - right_end < opts.max_len) {
+        right_end = next_pqs_start; // extend search region
       }
     }
     if (flags.verbose) {
-      if (strand == "+") {
-        Rcout << "negative regions on sense " <<
-          left_start - seq.begin() + 1 << "-" <<
+      Rcout << "negative regions " <<
+        left_start - seq.begin() + 1 << "-" <<
           left_end - seq.begin() << " " << 
-          right_start - seq.begin() + 1 << "-" <<
-          right_end - seq.begin() <<  endl;
-      } else {
-        Rcout << "negative regions on antisense " <<
-          seq.length() - (right_end - seq.begin()) + 1 << "-" <<
-          seq.length() - (right_start - seq.begin()) << " " <<
-          seq.length() - (left_end - seq.begin()) + 1 << "-" <<
-          seq.length() - (left_start - seq.begin()) << endl;
-      }
+            right_start - seq.begin() + 1 << "-" <<
+              right_end - seq.begin() <<  endl;
     }
     
     if (left_end - left_start > opts.run_min_len * 4) {
       // search left negative neighbourhood for overshadowed pqs
       
       find_all_runs(
-        subject, strand, 0, left_start, left_end, m, run_re_c, opts, new_flags, sc, 
+        subject, 0, left_start, left_end, m, run_re_c, opts, new_flags, sc, 
         seq.begin(), seq.length(), pqs_storage, ctable,
         cache_entry, pqs_cnt, neg_res, false, chrono::system_clock::now(),
         INT_MAX, INT_MAX, 0, fn_call_count
       );
-      pqs_storage.export_pqs(neg_res, seq.begin(), strand);
+      pqs_storage.export_pqs(neg_res);
     }
     if (right_end - right_start > opts.run_min_len * 4) {
       // search left negative neighbourhood for overshadowed pqs
       
       find_all_runs(
-        subject, strand, 0, right_start, right_end, m, run_re_c, opts, new_flags, sc, 
+        subject, 0, right_start, right_end, m, run_re_c, opts, new_flags, sc, 
         seq.begin(), seq.length(), pqs_storage, ctable,
         cache_entry, pqs_cnt, neg_res, false, chrono::system_clock::now(),
         INT_MAX, INT_MAX, 0, fn_call_count
       );
-      pqs_storage.export_pqs(neg_res, seq.begin(), strand);
+      pqs_storage.export_pqs(neg_res);
     }
   }
   // copy results to global results
   for (int i = 0; i < neg_res.items.size(); ++i) {
     res.items.push_back(neg_res.items[i]);
   }
-}
-
-void search_overscored_pqs_recursively(
-    SEXP subject,
-    const string &seq,
-    const string::const_iterator seq_start,
-    const string::const_iterator seq_end,
-    const string &strand,
-    const boost::regex &run_re_c,
-    pqs_cache &ctable,
-    const scoring &sc,
-    const opts_t &opts,
-    const flags_t &flags,
-    vector<results::item_t> res_items,
-    results &res,
-    int &fn_call_count
-)
-{
-  // Rcout << "Search negative regions..." << endl;
-  
-  run_match m[RUN_CNT];
-  pqs_cache::entry cache_entry(opts.max_len);
-  int pqs_cnt = 0;
-  pqs_storage_overlapping pqs_storage_ov(seq.begin());
-  pqs_storage_non_overlapping_revised pqs_storage_nov(seq.begin());
-  pqs_storage &pqs_storage = select_pqs_storage(opts.overlapping, pqs_storage_ov, pqs_storage_nov);
-  
-  string::const_iterator start = seq_start;
-  string::const_iterator end = seq.begin() + res_items[0].start - 1;
-  int i = 0;
-  
-  for (int i = 0; i <= res_items.size(); ++i) {
-    
-    if (end - start > opts.run_min_len * 4) {
-      // search negative region
-      // Rcout << "negative region " << start - seq.begin() + 1 << "-" << end - seq.begin() << " res_items.size: " << res_items.size() << endl;
-      
-      results neg_res(seq.length(), opts.min_score);
-      
-      find_all_runs(
-        subject, strand, 0, start, end, m, run_re_c, opts, flags, sc, 
-        seq.begin(), seq.length(), pqs_storage, ctable,
-        cache_entry, pqs_cnt, neg_res, false, chrono::system_clock::now(),
-        INT_MAX, INT_MAX, 0, fn_call_count
-      );
-      pqs_storage.export_pqs(neg_res, seq.begin(), strand);
-      
-      if (!neg_res.items.empty()) {
-        // Rcout << "found " << neg_res.items.size() << " hits in negative region" << endl;
-        
-        // run again
-        search_overscored_pqs_recursively(
-          subject,
-          seq,
-          start,
-          end,
-          strand,
-          run_re_c,
-          ctable,
-          sc,
-          opts,
-          flags,
-          vector<results::item_t>(neg_res.items),
-          res,
-          fn_call_count
-        );
-        // copy results to global results
-        for (int i = 0; i < neg_res.items.size(); ++i) {
-          res.items.push_back(neg_res.items[i]);
-        }
-      }
-    }
-    start = seq.begin() + res_items[i].start + res_items[i].len - 1;
-    if (i == res_items.size() - 1) {
-      end = seq_end;
-    } else {
-      end = seq.begin() + res_items[i+1].start - 1;
-    }
-  }
-  // Rcout << "fn_call_count: " << fn_call_count << endl;
 }
 
 bool cmp_res_item_by_start(const results::item_t &a, const results::item_t &b)
@@ -1010,11 +904,11 @@ void pqs_search(
   
   // Global sequence length is the only limit for the first G-run
   find_all_runs(
-    subject, strand, 0, seq.begin(), seq.end(), m, run_re_c, opts, flags, sc,
+    subject, 0, seq.begin(), seq.end(), m, run_re_c, opts, flags, sc,
     seq.begin(), seq.length(), pqs_storage, ctable,
     cache_entry, pqs_cnt, res, false, chrono::system_clock::now(), INT_MAX, INT_MAX, 0, fn_call_count
   );
-  pqs_storage.export_pqs(res, seq.begin(), strand);
+  pqs_storage.export_pqs(res);
   
   Rcout << "first_fn_call_count: " << fn_call_count << endl;
   
@@ -1026,7 +920,6 @@ void pqs_search(
     search_overscored_pqs(
       subject,
       seq,
-      strand,
       run_re_c,
       ctable,
       sc,
@@ -1270,47 +1163,69 @@ SEXP pqsfinder(
     ProfilerStop();
   #endif
   
-  vector<results::item_t> res_items(res_sense.items);
-  for (int i = 0; i < res_antisense.items.size(); ++i) {
-    res_items.push_back(res_antisense.items[i]);
-  }
+  size_t res_items_size = res_sense.items.size() + res_antisense.items.size();
 
-  IntegerVector res_start(res_items.size());
-  IntegerVector res_width(res_items.size());
-  IntegerVector res_score(res_items.size());
-  CharacterVector res_strand(res_items.size());
-  IntegerVector res_nt(res_items.size());
-  IntegerVector res_nb(res_items.size());
-  IntegerVector res_nm(res_items.size());
-  IntegerVector res_rl1(res_items.size());
-  IntegerVector res_rl2(res_items.size());
-  IntegerVector res_rl3(res_items.size());
-  IntegerVector res_ll1(res_items.size());
-  IntegerVector res_ll2(res_items.size());
-  IntegerVector res_ll3(res_items.size());
+  IntegerVector res_start(res_items_size);
+  IntegerVector res_width(res_items_size);
+  IntegerVector res_score(res_items_size);
+  CharacterVector res_strand(res_items_size);
+  IntegerVector res_nt(res_items_size);
+  IntegerVector res_nb(res_items_size);
+  IntegerVector res_nm(res_items_size);
+  IntegerVector res_rl1(res_items_size);
+  IntegerVector res_rl2(res_items_size);
+  IntegerVector res_rl3(res_items_size);
+  IntegerVector res_ll1(res_items_size);
+  IntegerVector res_ll2(res_items_size);
+  IntegerVector res_ll3(res_items_size);
   
-  for (int i = 0; i < res_items.size(); ++i) {
-    res_start[i] = res_items[i].start;
-    res_width[i] = res_items[i].len;
-    res_score[i] = res_items[i].score;
-    res_strand[i] = res_items[i].strand;
-    res_nt[i] = res_items[i].nt;
-    res_nb[i] = res_items[i].nb;
-    res_nm[i] = res_items[i].nm;
-    res_rl1[i] = res_items[i].rl1;
-    res_rl2[i] = res_items[i].rl2;
-    res_rl3[i] = res_items[i].rl3;
-    res_ll1[i] = res_items[i].ll1;
-    res_ll2[i] = res_items[i].ll2;
-    res_ll3[i] = res_items[i].ll3;
+  size_t i, k;
+  
+  for (i = 0; i < res_sense.items.size(); ++i) {
+    // s - ref + 1; R indexing starts at 1
+    res_start[i] = res_sense.items[i].start - seq.begin() + 1;
+    res_width[i] = res_sense.items[i].len;
+    res_score[i] = res_sense.items[i].score;
+    res_strand[i] = "+";
+    res_nt[i] = res_sense.items[i].nt;
+    res_nb[i] = res_sense.items[i].nb;
+    res_nm[i] = res_sense.items[i].nm;
+    res_rl1[i] = res_sense.items[i].rl1;
+    res_rl2[i] = res_sense.items[i].rl2;
+    res_rl3[i] = res_sense.items[i].rl3;
+    res_ll1[i] = res_sense.items[i].ll1;
+    res_ll2[i] = res_sense.items[i].ll2;
+    res_ll3[i] = res_sense.items[i].ll3;
+  }
+  
+  for (k = 0; k < res_antisense.items.size(); ++k) {
+    // seq_len - (e - ref) + 1; R indexing starts at 1
+    res_start[i] = seq_rc.length() -
+      (res_antisense.items[k].start +
+      res_antisense.items[k].len -
+      seq_rc.begin()) + 1;
+    res_width[i] = res_antisense.items[k].len;
+    res_score[i] = res_antisense.items[k].score;
+    res_strand[i] = "-";
+    res_nt[i] = res_antisense.items[k].nt;
+    res_nb[i] = res_antisense.items[k].nb;
+    res_nm[i] = res_antisense.items[k].nm;
+    res_rl1[i] = res_antisense.items[k].rl1;
+    res_rl2[i] = res_antisense.items[k].rl2;
+    res_rl3[i] = res_antisense.items[k].rl3;
+    res_ll1[i] = res_antisense.items[k].ll1;
+    res_ll2[i] = res_antisense.items[k].ll2;
+    res_ll3[i] = res_antisense.items[k].ll3;
+    ++i;
   }
 
   IntegerVector res_density(seq.length());
   IntegerVector res_max_scores(seq.length());
   
-  for (unsigned i = 0; i < seq.length(); ++i) {
-    res_density[i] = res_sense.density[i] + res_antisense.density[i];
-    res_max_scores[i] = max(res_sense.max_scores[i], res_antisense.max_scores[i]);
+  for (size_t i = 0; i < seq.length(); ++i) {
+    size_t antisense_i = seq.length() - i - 1;
+    res_density[i] = res_sense.density[i] + res_antisense.density[antisense_i];
+    res_max_scores[i] = max(res_sense.max_scores[i], res_antisense.max_scores[antisense_i]);
   }
   Function pqsviews("PQSViews");
   return pqsviews(

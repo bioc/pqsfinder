@@ -19,10 +19,9 @@ using namespace std;
 class results {
 public:
   struct item_t {
-    int start;
+    string::const_iterator start;
     int len;
     int score;
-    string strand;
     int nt;
     int nb;
     int nm;
@@ -59,20 +58,14 @@ public:
   }
   inline void save_pqs(
       const int score, const string::const_iterator &s,
-      const string::const_iterator &e, features_t &f,
-      const string::const_iterator &ref, const string &strand)
+      const string::const_iterator &e, features_t &f)
   {
     if (score >= this->min_score) {
       results::item_t item;
       
-      if (strand == "+") {
-        item.start = s - ref + 1; // R indexing starts at 1
-      } else {
-        item.start = this->seq_len - (e - ref) + 1;
-      }
+      item.start = s;
       item.len = e - s;
       item.score = score;
-      item.strand = strand;
       item.nt = f.nt;
       item.nb = f.nb;
       item.nm = f.nm;
@@ -88,33 +81,21 @@ public:
   }
   inline void save_density_and_max_scores(
       const string::const_iterator &s, const string::const_iterator &ref,
-      const string &strand, const int *density, const int *max_scores, const int max_len)
+      const int *density, const int *max_scores, const int max_len)
   {
-    int offset, k_limit;
-    if (strand == "+") {
-      offset = s - ref;
-      k_limit = min(max_len, this->seq_len - offset);
-      for (int k = 0; k < k_limit; ++k) {
-        int i = offset + k;
-        this->density[i] += density[k];
-        this->max_scores[i] = max(this->max_scores[i], max_scores[k]);
-      }
-    }
-    else {
-      offset = (this->seq_len - 1) - (s - ref);
-      k_limit = min(max_len, offset + 1);
-      for (int k = 0; k < k_limit; ++k) {
-        int i = offset - k;
-        this->density[i] += density[k];
-        this->max_scores[i] = max(this->max_scores[i], max_scores[k]);
-      }
+    int offset = s - ref;
+    int k_limit = min(max_len, this->seq_len - offset);
+    for (int k = 0; k < k_limit; ++k) {
+      int i = offset + k;
+      this->density[i] += density[k];
+      this->max_scores[i] = max(this->max_scores[i], max_scores[k]);
     }
   }
   inline void print(const string::const_iterator &ref) const {
     Rcout << "Results" << endl;
     for (unsigned i = 0; i < this->items.size(); i++) {
-      Rcout << "PQS[" << i << "]: " << this->items[i].start << " "
-            << string(ref + this->items[i].start, ref + this->items[i].start + this->items[i].len)
+      Rcout << "PQS[" << i << "]: " << this->items[i].start - ref + 1 << " "
+            << string(this->items[i].start, this->items[i].start + this->items[i].len)
             << " " << this->items[i].score << endl;
     }
   }
