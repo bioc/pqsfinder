@@ -46,8 +46,8 @@ public:
       this->export_pqs(res); // this clears the pqs_map
       this->pqs_start = s;
     }
-    map_t::iterator it = pqs_map.find(e);
-    if (it != pqs_map.end()) {
+    map_t::iterator it = this->pqs_map.find(e);
+    if (it != this->pqs_map.end()) {
       if (score > it->second.score) {
         it->second.score = score;
         it->second.f = f;
@@ -56,7 +56,7 @@ public:
       }
     } else {
       map_value_t value = {score, f};
-      pqs_map.insert(make_pair(e, value));
+      this->pqs_map.insert(make_pair(e, value));
     }
   }
   virtual void export_pqs(
@@ -65,7 +65,7 @@ public:
     for (map_t::iterator it = this->pqs_map.begin(); it != this->pqs_map.end(); ++it) {
       res.save_pqs(it->second.score, this->pqs_start, it->first, it->second.f);
     }
-    pqs_map.clear();
+    this->pqs_map.clear();
   }
 };
 
@@ -98,8 +98,8 @@ public:
     if (e > this->last_e) {
       this->last_e = e;
     }
-    storage_t::iterator it = st.find(score);
-    if (it != st.end()) {
+    storage_t::iterator it = this->st.find(score);
+    if (it != this->st.end()) {
       list<range> &list = it->second;
       if (list.empty()) {
         throw runtime_error("Inconsistent state of non-overlapping storage.");
@@ -108,7 +108,7 @@ public:
       list.push_back(range(s, e, f));
     }
     else {
-      st.insert(storage_t::value_type(score, list<range>(1, range(s, e, f))));
+      this->st.insert(storage_t::value_type(score, list<range>(1, range(s, e, f))));
     }
   }
   virtual void export_pqs(
@@ -118,8 +118,8 @@ public:
     storage_t::iterator it, r_it, temp;
     list<range>::iterator prev, curr;
     
-    while (!st.empty()) {
-      it = --st.end(); // decrement to point on last list
+    while (!this->st.empty()) {
+      it = --this->st.end(); // decrement to point on last list
       
       // resolve overlaps between equal-scoring PQS
       prev = it->second.begin();
@@ -146,7 +146,7 @@ public:
         res.save_pqs(it->first, best_pqs.s, best_pqs.e, best_pqs.f);
         it->second.pop_front();
         
-        if (it != st.begin()) {
+        if (it != this->st.begin()) {
           r_it = std::prev(it); // set score level to the next lower level
           
           while (true) {
@@ -164,17 +164,17 @@ public:
                 ++l_it;
               }
             }
-            if (r_it == st.begin()) {
+            if (r_it == this->st.begin()) {
               // the end of iteration
               if (l.empty()) {
-                st.erase(r_it); // erase empty score level
+                this->st.erase(r_it); // erase empty score level
               }
               break;
             } else if (l.empty()) {
               // delete empty score level from storage and move on lower score level
               temp = r_it; // erase operation invalidates iterator
               --r_it;
-              st.erase(temp);
+              this->st.erase(temp);
             }
             else {
               // just move on lower score level
@@ -183,11 +183,11 @@ public:
           }
         }
       }
-      st.erase(it); // erase empty score level
+      this->st.erase(it); // erase empty score level
     }
   }
   inline void print() {
-    for (storage_t::const_iterator it = st.begin(); it != st.end(); ++it) {
+    for (storage_t::const_iterator it = this->st.begin(); it != this->st.end(); ++it) {
       Rcout << it->first << ":";
       for (list<range>::const_iterator lit = it->second.begin(); lit != it->second.end(); ++lit) {
         Rcout << " " << string(lit->s, lit->e);
