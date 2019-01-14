@@ -6,8 +6,8 @@
  * Package: pqsfinder
  */
 
-#ifndef PQS_STORAGE_HEADER
-#define PQS_STORAGE_HEADER
+#ifndef STORAGE_HEADER
+#define STORAGE_HEADER
 
 #include <Rcpp.h>
 #include "results.h"
@@ -16,17 +16,16 @@
 using namespace Rcpp;
 using namespace std;
 
-class pqs_storage {
+class storage {
 public:
-  virtual ~pqs_storage() {};
+  virtual ~storage() {};
   virtual void insert_pqs(
       int score, string::const_iterator s, string::const_iterator e, features_t &f,
       results &res) = 0;
-  virtual void export_pqs(
-      results &res) = 0;
+  virtual void export_pqs(results &res) = 0;
 };
 
-class pqs_storage_overlapping : public pqs_storage {
+class overlapping_storage : public storage {
 private:
   typedef struct {
     int score;
@@ -37,7 +36,7 @@ private:
   string::const_iterator pqs_start;
   
 public:
-  pqs_storage_overlapping(string::const_iterator pqs_start) : pqs_start(pqs_start) {}
+  overlapping_storage(string::const_iterator pqs_start) : pqs_start(pqs_start) {}
   
   virtual void insert_pqs(
       int score, string::const_iterator s, string::const_iterator e, features_t &f,
@@ -70,7 +69,7 @@ public:
   }
 };
 
-class pqs_storage_non_overlapping_revised: public pqs_storage {
+class revised_non_overlapping_storage: public storage {
 private:
   class range {
   public:
@@ -86,7 +85,7 @@ private:
   string::const_iterator last_e;
   
 public:
-  pqs_storage_non_overlapping_revised(string::const_iterator start) : last_e(start) {}
+  revised_non_overlapping_storage(string::const_iterator start) : last_e(start) {}
   
   virtual void insert_pqs(
       int score, string::const_iterator s, string::const_iterator e, features_t &f,

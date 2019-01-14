@@ -19,7 +19,7 @@
 #include <google/profiler.h>
 #endif
 #include "results.h"
-#include "pqs_storage.h"
+#include "storage.h"
 #include "pqs_cache.h"
 #include "features.h"
 
@@ -40,14 +40,8 @@ using namespace std;
 
 /*
  * TODO:
- * - start property in results to be iterator
- * - completely remove strand from results object, storage and the call stack starting with pqs_search
  * - remove cache and replace cache_entry by something more readable
- * - simplify search_overscored_pqs
  * - rename search to find
- * - rename pqs_search to find_pqs
- * - rename pqs_storage to storage
- * - remove unused storage_implementation
  * - ensure strict usage of this-> convention for clarity
  * - results joining
  * - sequence splitting to chunks
@@ -507,7 +501,7 @@ void find_all_runs(
     const scoring &sc,
     const string::const_iterator &ref,
     const size_t len,
-    pqs_storage &pqs_storage,
+    storage &pqs_storage,
     pqs_cache &ctable,
     pqs_cache::entry &cache_entry,
     int &pqs_cnt,
@@ -722,10 +716,10 @@ void find_all_runs(
  * @param nov Non-overlapping storage.
  * @return Reference to storage interface.
  */
-pqs_storage &select_pqs_storage(
+storage &select_pqs_storage(
     bool overlapping,
-    pqs_storage_overlapping &ov,
-    pqs_storage_non_overlapping_revised &nov)
+    overlapping_storage &ov,
+    revised_non_overlapping_storage &nov)
 {
   if (overlapping)
     return ov;
@@ -733,7 +727,7 @@ pqs_storage &select_pqs_storage(
     return nov;
 }
 
-void search_overscored_pqs(
+void find_overscored_pqs(
     SEXP subject,
     const string &seq,
     const boost::regex &run_re_c,
@@ -747,15 +741,15 @@ void search_overscored_pqs(
 )
 {
   if (flags.verbose) {
-    Rcout << "Search overshadowed pqs..." << endl;
+    Rcout << "Find overshadowed pqs..." << endl;
   }
   
   run_match m[RUN_CNT];
   pqs_cache::entry cache_entry(opts.max_len);
   int pqs_cnt = 0;
-  pqs_storage_overlapping pqs_storage_ov(seq.begin());
-  pqs_storage_non_overlapping_revised pqs_storage_nov(seq.begin());
-  pqs_storage &pqs_storage = select_pqs_storage(opts.overlapping, pqs_storage_ov, pqs_storage_nov);
+  overlapping_storage ov_storage(seq.begin());
+  revised_non_overlapping_storage nov_storage(seq.begin());
+  storage &pqs_storage = select_pqs_storage(opts.overlapping, ov_storage, nov_storage);
   
   // neccessary to have clean results object with zero max_scores vector
   results neg_res(seq.length(), opts.min_score);
@@ -830,7 +824,7 @@ bool cmp_res_item_by_start(const results::item_t &a, const results::item_t &b)
   return a.start < b.start;
 }
 
-void pqs_prescan(
+void prescan_pqs(
     const string &seq,
     const scoring &sc,
     const opts_t &opts,
@@ -878,7 +872,7 @@ void pqs_prescan(
  * @param flags Algorithm flags
  * @param res Results object
  */
-void pqs_search(
+void find_pqs(
     SEXP subject,
     const string &seq,
     const string strand,
@@ -892,14 +886,14 @@ void pqs_search(
   run_match m[RUN_CNT];
   pqs_cache::entry cache_entry(opts.max_len);
   int pqs_cnt = 0;
-  pqs_storage_overlapping pqs_storage_ov(seq.begin());
-  pqs_storage_non_overlapping_revised pqs_storage_nov(seq.begin());
-  pqs_storage &pqs_storage = select_pqs_storage(opts.overlapping, pqs_storage_ov, pqs_storage_nov);
+  overlapping_storage ov_storage(seq.begin());
+  revised_non_overlapping_storage nov_storage(seq.begin());
+  storage &pqs_storage = select_pqs_storage(opts.overlapping, ov_storage, nov_storage);
   
   int fn_call_count = 0;
   
   if (flags.prescan) {
-    pqs_prescan(seq, sc, opts, flags, res);
+    prescan_pqs(seq, sc, opts, flags, res);
   }
   
   // Global sequence length is the only limit for the first G-run
@@ -917,7 +911,7 @@ void pqs_search(
     vector<results::item_t> res_items(res.items);
     sort(res_items.begin(), res_items.end(), cmp_res_item_by_start);
     
-    search_overscored_pqs(
+    find_overscored_pqs(
       subject,
       seq,
       run_re_c,
@@ -1149,12 +1143,12 @@ SEXP pqsfinder(
 
   if (strand == "+" || strand == "*") {
     Rcout << "Searching on sense strand..." << endl;
-    pqs_search(subject, seq, "+", run_re_c, ctable, sc, opts, flags, res_sense);
+    find_pqs(subject, seq, "+", run_re_c, ctable, sc, opts, flags, res_sense);
     Rcout << "Search status: finished              " << endl;
   }
   if (strand == "-" || strand == "*") {
     Rcout << "Searching on antisense strand..." << endl;
-    pqs_search(subject_rc, seq_rc, "-", run_re_c, ctable, sc, opts, flags, res_antisense);
+    find_pqs(subject_rc, seq_rc, "-", run_re_c, ctable, sc, opts, flags, res_antisense);
     Rcout << "Search status: finished              " << endl;
   }
 
