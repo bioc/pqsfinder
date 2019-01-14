@@ -78,6 +78,24 @@ test_that("there no overshadowing", {
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
 
+test_that("maxScores vector is a max of maxScores on sense and antisense", {
+  library(stringi)
+  test_seq <- DNAString(stri_rand_shuffle(strrep("ACCGGT", 1000)))
+  pv <- pqsfinder(test_seq)
+  pv_p <- pqsfinder(test_seq, strand = "+")
+  pv_m <- pqsfinder(test_seq, strand = "-")
+  expect_equal(maxScores(pv), pmax(maxScores(pv_p), maxScores(pv_m)))
+})
+
+test_that("density vector is a sum of density on sense and antisense", {
+  library(stringi)
+  test_seq <- DNAString(stri_rand_shuffle(strrep("ACCGGT", 1000)))
+  pv <- pqsfinder(test_seq)
+  pv_p <- pqsfinder(test_seq, strand = "+")
+  pv_m <- pqsfinder(test_seq, strand = "-")
+  expect_equal(density(pv), density(pv_p) + density(pv_m))
+})
+
 test_that("sequences pqs parts can be extracted", {
   
   library(stringr)
