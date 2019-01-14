@@ -45,7 +45,7 @@ public:
       results &res, const string::const_iterator &ref, const string &strand)
   {
     if (this->pqs_start < s) {
-      this->export_pqs(res, ref, strand);
+      this->export_pqs(res, ref, strand); // this clears the pqs_map
       this->pqs_start = s;
     }
     map_t::iterator it = pqs_map.find(e);

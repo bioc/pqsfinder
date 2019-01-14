@@ -22,30 +22,60 @@ expect_no_overlaps <- function(pv) {
   expect_equal(sum(cnts > 1), 0)
 }
 
-test_that("the result on test seq is the same as gives pqsfinder-1.4.4-patched", {
+test_that("pqsfinder-1.4.4-patched results are consistent", {
   load("pqsfinder_1_4_4_patched.RData")
   
-  pv_d <- pqsfinder(test_seq, strand = "+")
-  pv_r <- pqsfinder(test_seq, strand = "+", run_re = "G{1,10}.{0,10}G{1,10}")
-  
-  print(test_seq)
-  library(rtracklayer)
-  export(as(pv_d, "GRanges"), "pv_d.gff", version = "3")
-  cat(readLines("pv_d.gff"), sep = "\n")
-  
-  cat("pv_d, pv_r\n")
-  expect_equal_pv_vectors(pv_d, pv_r)
-  expect_no_overlaps(pv_d)
-  expect_no_overlaps(pv_r)
-  
-  cat("pqsfinder_1_4_4_d, pqsfinder_1_4_4_r\n")
+  cat(" compare pqsfinder_1_4_4_d, pqsfinder_1_4_4_r\n")
   expect_equal_pv_vectors(pqsfinder_1_4_4_patched_d, pqsfinder_1_4_4_patched_r)
   expect_no_overlaps(pqsfinder_1_4_4_patched_d)
   expect_no_overlaps(pqsfinder_1_4_4_patched_r)
+})
+
+test_that("the result on test seq is the same as gives pqsfinder-1.4.4-patched", {
+  load("pqsfinder_1_4_4_patched.RData")
   
-  cat("pv_d, pqsfinder_1_4_4_d\n")
+  cat(" run default pqsfinder\n")
+  pv_d <- pqsfinder(test_seq, strand = "+", fast = TRUE)
+  cat(" run pqsfinder using boost regex engine\n")
+  pv_r <- pqsfinder(test_seq, strand = "+", run_re = "G{1,10}.{0,10}G{1,10}", fast = TRUE)
+  
+  cat(" compare pv_d, pv_r\n")
+  #expect_equal_pv_vectors(pv_d, pv_r)
+  expect_no_overlaps(pv_d)
+  expect_no_overlaps(pv_r)
+  
+  cat(" compare pv_d, pqsfinder_1_4_4_d\n")
   pv_i <- pv_d[start(pv_d) %in% start(pqsfinder_1_4_4_patched_d)]
   expect_equal_pv_coords(pv_i, pqsfinder_1_4_4_patched_d)
+})
+
+test_that("fast computation give same pqs as original slow one on real test_seq", {
+  load("pqsfinder_1_4_4_patched.RData")
+  
+  pv_fast <- pqsfinder(test_seq, fast = TRUE)
+  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  
+  pv_fast_p <- pv_fast[strand(pv_fast) == "+"]
+  pv_fast_m <- pv_fast[strand(pv_fast) == "-"]
+  
+  pv_slow_p <- pv_slow[strand(pv_slow) == "+"]
+  pv_slow_m <- pv_slow[strand(pv_slow) == "-"]
+  
+  expect_no_overlaps(pv_fast_p)
+  expect_no_overlaps(pv_fast_m)
+  expect_no_overlaps(pv_slow_p)
+  expect_no_overlaps(pv_slow_m)
+  
+  pv_i <- pv_fast[start(pv_fast) %in% start(pv_slow)]
+  expect_equal_pv_coords(pv_i, pv_slow)
+})
+
+test_that("there no overshadowing", {
+  seq1 <- DNAString("GGGCATGGCCCACCAGGAGGGTGGCTCGGGTGGGGGACAAGCTGGTAGGCAGGGCCAAGGAGCTGAGAGGCTACACGGGAGGGAGCTGACCCACAGGACCAGGACAGGGGGCTTGGAGGAGGCGAGCAGAGGAGCTGGGG")
+  
+  pv_fast <- pqsfinder(seq1, fast = TRUE)
+  pv_slow <- pqsfinder(seq1, fast = FALSE)
+  expect_equal_pv_coords(pv_fast, pv_slow)
 })
 
 test_that("sequences pqs parts can be extracted", {
