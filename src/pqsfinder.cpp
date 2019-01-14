@@ -20,7 +20,6 @@
 #endif
 #include "results.h"
 #include "storage.h"
-#include "pqs_cache.h"
 #include "features.h"
 
 using namespace Rcpp;
@@ -79,7 +78,6 @@ public:
 };
 
 struct flags_t {
-  bool use_cache;
   bool use_re;
   bool use_prof;
   bool verbose;
@@ -109,6 +107,28 @@ public:
   int length() const {
     return second - first;
   };
+};
+
+class vector_cache {
+public:
+  int *max_scores;
+  int *density;
+  
+  vector_cache(const int seq_len)
+  {
+    this->density = (int *)calloc(seq_len, sizeof(int));
+    if (this->density == NULL)
+      throw runtime_error("Unable to allocate memory for density vector.");
+    this->max_scores = (int *)calloc(seq_len, sizeof(int));
+    if (this->max_scores == NULL)
+      throw runtime_error("Unable to allocate memory for vector of maximum scores.");
+  }
+  ~vector_cache() {
+    if (this->density != NULL)
+      free(this->density);
+    if (this->max_scores != NULL)
+      free(this->max_scores);
+  }
 };
 
 
@@ -483,7 +503,7 @@ void debug_s_e(
  * @param pqs_start Start of the first G-run
  * @param pqs_storage Storage object
  * @param ctable Cache table
- * @param cache_entry Candidate cache entry
+ * @param vec_cache Candidate cache entry
  * @param pqs_cnt PQS counter
  * @param res Object for output PQS
  * @param zero_loop Flag, if PQS has zero-length loop
@@ -502,8 +522,7 @@ void find_all_runs(
     const string::const_iterator &ref,
     const size_t len,
     storage &pqs_storage,
-    pqs_cache &ctable,
-    pqs_cache::entry &cache_entry,
+    vector_cache &vec_cache,
     int &pqs_cnt,
     results &res,
     bool zero_loop,
@@ -515,7 +534,7 @@ void find_all_runs(
 {
   string::const_iterator s, e, min_e;
   int score, loop_len;
-  pqs_cache::entry *cache_hit;
+  vector_cache *cache_hit;
   bool found_any;
   int next_min_g_count;
   int next_min_run_len;
@@ -536,28 +555,10 @@ void find_all_runs(
   {
     if (i == 0)
     {// specific code for the first run matching
-      if (flags.use_cache && cache_entry.density[0] > pqs_cache::use_treshold)
-      {
-        cache_hit = ctable.get(s, min(s + opts.max_len, end));
-
-        if (cache_hit != NULL) {
-          if (flags.debug)
-            Rcout << "Cache hit: " << s - ref  << " " << string(s, s+cache_hit->len)
-                  << " " << cache_hit->score << endl;
-
-          res.save_density_and_max_scores(
-            s, ref, cache_hit->density, cache_hit->max_scores, opts.max_len);
-
-          pqs_storage.insert_pqs(cache_hit->score, s, s + cache_hit->len, cache_hit->f, res);
-          continue;
-        }
-      }
-      // reset score of best PQS starting at current position
-      cache_entry.score = 0;
       // reset density and score distribution
       for (int k = 0; k < opts.max_len; ++k) {
-        cache_entry.density[k] = 0;
-        cache_entry.max_scores[k] = 0;
+        vec_cache.density[k] = 0;
+        vec_cache.max_scores[k] = 0;
       }
     }
     min_e = s + opts.run_min_len;
@@ -621,7 +622,7 @@ void find_all_runs(
         // enforce G4 total length limit to be relative to the first G-run start
         find_all_runs(
           subject, i+1, e, min(s + opts.max_len, end), m, run_re_c, opts,
-          flags, sc, ref, len, pqs_storage, ctable, cache_entry, pqs_cnt, res,
+          flags, sc, ref, len, pqs_storage, vec_cache, pqs_cnt, res,
           false, s_time, next_min_g_count, next_min_run_len, next_defect_count, fn_call_count
         );
       } else if (i < 3) {
@@ -631,7 +632,7 @@ void find_all_runs(
         }
         find_all_runs(
           subject, i+1, e, end, m, run_re_c, opts, flags, sc, ref, len,
-          pqs_storage, ctable, cache_entry, pqs_cnt, res,
+          pqs_storage, vec_cache, pqs_cnt, res,
           (loop_len == 0 ? true : zero_loop), s_time, next_min_g_count, next_min_run_len, next_defect_count, fn_call_count
         );
       } else {
@@ -671,7 +672,7 @@ void find_all_runs(
           int offset = m[0].first - ref; // for + strand only
           
           for (int k = 0; k < pqs_len; ++k) {
-            cache_entry.max_scores[k] = max(cache_entry.max_scores[k], score);
+            vec_cache.max_scores[k] = max(vec_cache.max_scores[k], score);
             res.max_scores[offset + k] = max(res.max_scores[offset + k], score);
           }
           if (score >= opts.min_score) {
@@ -679,15 +680,8 @@ void find_all_runs(
             pqs_storage.insert_pqs(score, m[0].first, m[3].second, pqs_features, res);
             
             for (int k = 0; k < pqs_len; ++k)
-              ++cache_entry.density[k];
+              ++vec_cache.density[k];
             
-            if (score > cache_entry.score ||
-                (score == cache_entry.score && pqs_len < cache_entry.len)) {
-              // update properties of caching candidate
-              cache_entry.score = score;
-              cache_entry.len = pqs_len;
-              cache_entry.f = pqs_features;
-            }
             if (flags.verbose)
               print_pqs(m, score, ref);
           }
@@ -695,12 +689,9 @@ void find_all_runs(
       }
     }
     if (i == 0) {
-      if (flags.use_cache && cache_entry.density[0] > pqs_cache::use_treshold)
-        ctable.put(s, min(s + opts.max_len, end), cache_entry);
-
       // add locally accumulated max scores to global max scores array
       res.save_density_and_max_scores(
-        s, ref, cache_entry.density, cache_entry.max_scores, opts.max_len);
+        s, ref, vec_cache.density, vec_cache.max_scores, opts.max_len);
     }
     if (!found_any) {
       break;
@@ -731,7 +722,6 @@ void find_overscored_pqs(
     SEXP subject,
     const string &seq,
     const boost::regex &run_re_c,
-    pqs_cache &ctable,
     const scoring &sc,
     const opts_t &opts,
     const flags_t &flags,
@@ -745,7 +735,7 @@ void find_overscored_pqs(
   }
   
   run_match m[RUN_CNT];
-  pqs_cache::entry cache_entry(opts.max_len);
+  vector_cache vec_cache(opts.max_len);
   int pqs_cnt = 0;
   overlapping_storage ov_storage(seq.begin());
   revised_non_overlapping_storage nov_storage(seq.begin());
@@ -795,8 +785,8 @@ void find_overscored_pqs(
       
       find_all_runs(
         subject, 0, left_start, left_end, m, run_re_c, opts, new_flags, sc, 
-        seq.begin(), seq.length(), pqs_storage, ctable,
-        cache_entry, pqs_cnt, neg_res, false, chrono::system_clock::now(),
+        seq.begin(), seq.length(), pqs_storage,
+        vec_cache, pqs_cnt, neg_res, false, chrono::system_clock::now(),
         INT_MAX, INT_MAX, 0, fn_call_count
       );
       pqs_storage.export_pqs(neg_res);
@@ -806,8 +796,8 @@ void find_overscored_pqs(
       
       find_all_runs(
         subject, 0, right_start, right_end, m, run_re_c, opts, new_flags, sc, 
-        seq.begin(), seq.length(), pqs_storage, ctable,
-        cache_entry, pqs_cnt, neg_res, false, chrono::system_clock::now(),
+        seq.begin(), seq.length(), pqs_storage,
+        vec_cache, pqs_cnt, neg_res, false, chrono::system_clock::now(),
         INT_MAX, INT_MAX, 0, fn_call_count
       );
       pqs_storage.export_pqs(neg_res);
@@ -877,14 +867,13 @@ void find_pqs(
     const string &seq,
     const string strand,
     const boost::regex &run_re_c,
-    pqs_cache &ctable,
     const scoring &sc,
     const opts_t &opts,
     const flags_t &flags,
     results &res)
 {
   run_match m[RUN_CNT];
-  pqs_cache::entry cache_entry(opts.max_len);
+  vector_cache vec_cache(opts.max_len);
   int pqs_cnt = 0;
   overlapping_storage ov_storage(seq.begin());
   revised_non_overlapping_storage nov_storage(seq.begin());
@@ -899,8 +888,8 @@ void find_pqs(
   // Global sequence length is the only limit for the first G-run
   find_all_runs(
     subject, 0, seq.begin(), seq.end(), m, run_re_c, opts, flags, sc,
-    seq.begin(), seq.length(), pqs_storage, ctable,
-    cache_entry, pqs_cnt, res, false, chrono::system_clock::now(), INT_MAX, INT_MAX, 0, fn_call_count
+    seq.begin(), seq.length(), pqs_storage, vec_cache, pqs_cnt,
+    res, false, chrono::system_clock::now(), INT_MAX, INT_MAX, 0, fn_call_count
   );
   pqs_storage.export_pqs(res);
   
@@ -912,17 +901,9 @@ void find_pqs(
     sort(res_items.begin(), res_items.end(), cmp_res_item_by_start);
     
     find_overscored_pqs(
-      subject,
-      seq,
-      run_re_c,
-      ctable,
-      sc,
-      opts,
-      flags,
-      res_items,
-      res,
-      fn_call_count
-    );// copy results to global results
+      subject, seq, run_re_c, sc, opts, flags,
+      res_items, res, fn_call_count
+    );
     
     Rcout << "second_fn_call_count: " << fn_call_count << endl;
   }
@@ -1064,7 +1045,6 @@ SEXP pqsfinder(
     throw invalid_argument("Subject must be DNAString object.");
 
   flags_t flags;
-  flags.use_cache = false; // TODO: cache implementation should be double checked
   flags.use_re = false;
   flags.use_prof = false;
   flags.debug = false;
@@ -1116,12 +1096,10 @@ SEXP pqsfinder(
 
   results res_sense(seq.length(), opts.min_score);
   results res_antisense(seq.length(), opts.min_score);
-  pqs_cache ctable(opts.max_len);
   boost::regex run_re_c(run_re);
 
   if (flags.debug) {
     Rcout << "G-run regexp: " << run_re << endl;
-    Rcout << "Use cache: " << flags.use_cache << endl;
     Rcout << "Use regexp engine: " << flags.use_re << endl;
     Rcout << "Input sequence length: " << seq.length() << endl;
     Rcout << "Use user fn: " << (custom_scoring_fn != R_NilValue) << endl;
@@ -1143,12 +1121,12 @@ SEXP pqsfinder(
 
   if (strand == "+" || strand == "*") {
     Rcout << "Searching on sense strand..." << endl;
-    find_pqs(subject, seq, "+", run_re_c, ctable, sc, opts, flags, res_sense);
+    find_pqs(subject, seq, "+", run_re_c, sc, opts, flags, res_sense);
     Rcout << "Search status: finished              " << endl;
   }
   if (strand == "-" || strand == "*") {
     Rcout << "Searching on antisense strand..." << endl;
-    find_pqs(subject_rc, seq_rc, "-", run_re_c, ctable, sc, opts, flags, res_antisense);
+    find_pqs(subject_rc, seq_rc, "-", run_re_c, sc, opts, flags, res_antisense);
     Rcout << "Search status: finished              " << endl;
   }
 
