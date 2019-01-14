@@ -39,9 +39,7 @@ using namespace std;
 
 /*
  * TODO:
- * - remove cache and replace cache_entry by something more readable
- * - rename search to find
- * - ensure strict usage of this-> convention for clarity
+ * - join flags and opts into opts
  * - results joining
  * - sequence splitting to chunks
  * - multi-threading (turn off ETTC and calling R_check_user_interrupt) 
@@ -809,6 +807,13 @@ void find_overscored_pqs(
   }
 }
 
+/**
+ * Compare results item by start coordinates
+ * 
+ * @param a First item
+ * @param b Second item
+ * @return Is a lower than b?
+ */
 bool cmp_res_item_by_start(const results::item_t &a, const results::item_t &b)
 {
   return a.start < b.start;
