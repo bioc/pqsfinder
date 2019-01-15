@@ -1,7 +1,9 @@
 /**
- * Implementation of PQS search algorithm.
+ * pqsfinder: an exhaustive and imperfection-tolerant search tool for potential
+ * quadruplex-forming sequences (PQS)
  *
- * Author: Jiri Hon <jiri.hon@gmail.com>
+ * Author: Jiri Hon <jiri.hon@gmail.com>,
+ *         Dominika Labudova <d.labudova@gmail.com>
  * Date: 2016/01/17
  * Package: pqsfinder
  */
@@ -27,7 +29,7 @@ using namespace std;
 
 
 /*
- * Extract from C++ reference documentation to string iterator semantics:
+ * Excerpt from C++ reference documentation on string iterator semantics:
  *
  * string::end method returns an iterator pointing to the __past-the-end__ character
  * of the string! The past-the-end character is a theoretical character that would
@@ -39,13 +41,12 @@ using namespace std;
 
 /*
  * TODO:
- * - join flags and opts into opts
  * - results joining
  * - sequence splitting to chunks
  * - multi-threading (turn off ETTC and calling R_check_user_interrupt) 
  */
 
-// Implementation constants
+
 static const int RUN_CNT = 4;
 
 
@@ -75,7 +76,17 @@ public:
   }
 };
 
-struct flags_t {
+
+// algorithm options
+struct opts_t {
+  int max_len;
+  int min_score;
+  int run_min_len;
+  int run_max_len;
+  int loop_min_len;
+  int loop_max_len;
+  int check_int_period;
+  bool overlapping;
   bool use_re;
   bool use_prof;
   bool verbose;
@@ -85,18 +96,8 @@ struct flags_t {
   bool prescan;
 };
 
-struct opts_t {
-  bool overlapping;
-  int max_len;
-  int min_score;
-  int run_min_len;
-  int run_max_len;
-  int loop_min_len;
-  int loop_max_len;
-  int check_int_period;
-};
 
-// Class representing one run from quadruplex
+// class representing one run from quadruplex
 class run_match {
 public:
   string::const_iterator first;
@@ -107,6 +108,8 @@ public:
   };
 };
 
+
+// class for caching regional max scores and density
 class vector_cache {
 public:
   int *max_scores;
@@ -382,7 +385,6 @@ inline bool run_regex_search(
  * @param m Match info structure
  * @param run_re_c Run regular expression
  * @param opts Algorithm options and limits
- * @param flags Algorithm flags
  * @return True on success, false otherwise
  */
 inline bool find_run(
@@ -390,12 +392,11 @@ inline bool find_run(
     const string::const_iterator &end,
     run_match &m,
     const boost::regex &run_re_c,
-    const opts_t &opts,
-    const flags_t &flags)
+    const opts_t &opts)
 {
   string::const_iterator s = start, e;
   
-  if (flags.use_re) {
+  if (opts.use_re) {
     static boost::smatch boost_m;
     bool status = false;
     
@@ -424,7 +425,7 @@ inline bool find_run(
       m.first = boost_m[0].first;
       m.second = boost_m[0].second;
       
-      if (flags.fast) {
+      if (opts.fast) {
         m.g_count = count_g_num(m);
       }
       return true;
@@ -451,7 +452,7 @@ inline bool find_run(
     m.first = s;
     m.second = ++e; // correction to point on the past-the-end character
     
-    if (flags.fast) {
+    if (opts.fast) {
       m.g_count = count_g_num(m);
     }
     return true;
@@ -488,7 +489,6 @@ void debug_s_e(
  * Recursively idetify 4 consecutive runs making quadruplex
  *
  * @param subject DNAString object
- * @param strand Strand specification
  * @param i Odinal number of quadruplex run
  * @param start Start position for the current run
  * @param end Limit end position for the current run
@@ -500,7 +500,6 @@ void debug_s_e(
  * @param len Total sequence length
  * @param pqs_start Start of the first G-run
  * @param pqs_storage Storage object
- * @param ctable Cache table
  * @param vec_cache Candidate cache entry
  * @param pqs_cnt PQS counter
  * @param res Object for output PQS
@@ -515,7 +514,6 @@ void find_all_runs(
     run_match m[],
     const boost::regex &run_re_c,
     const opts_t &opts,
-    const flags_t &flags,
     const scoring &sc,
     const string::const_iterator &ref,
     const size_t len,
@@ -544,7 +542,7 @@ void find_all_runs(
     loop_len = start - m[i-1].second;
     if (loop_len < opts.loop_min_len) {
       start = min(m[i-1].second + opts.loop_min_len, end); // skip too short loop
-    } else if (flags.use_default_scoring && loop_len == 0 && zero_loop) {
+    } else if (opts.use_default_scoring && loop_len == 0 && zero_loop) {
       start = min(m[i-1].second + 1, end); // only one zero-length loop is allowed
     }
   }
@@ -562,7 +560,7 @@ void find_all_runs(
     min_e = s + opts.run_min_len;
     found_any = false;
 
-    for (e = end; e >= min_e && find_run(s, e, m[i], run_re_c, opts, flags); e--)
+    for (e = end; e >= min_e && find_run(s, e, m[i], run_re_c, opts); e--)
     {
       found_any = true;
       // update search bounds
@@ -573,7 +571,7 @@ void find_all_runs(
       next_min_run_len = min(min_run_len, m[i].length());
       next_defect_count = defect_count + (m[i].length() != m[i].g_count);
       
-      if (flags.prescan && i == 0) {
+      if (opts.prescan && i == 0) {
         int max_total_g_count = 0;
         string::const_iterator pqs_max_end = min(s + opts.max_len, end);
         
@@ -583,7 +581,7 @@ void find_all_runs(
           }
         }
         int max_tetrads = max_total_g_count / 4;
-        if (flags.verbose) {
+        if (opts.verbose) {
           Rcout << "-------" << endl << "max_tetrads: " << max_tetrads << endl;
         }
         next_min_g_count = min(next_min_g_count, max_tetrads);
@@ -600,7 +598,7 @@ void find_all_runs(
       int max_score = (next_min_tetrads - 1) * sc.tetrad_bonus
         - next_defect_count * min(sc.bulge_penalty, sc.mismatch_penalty);
       
-      if (flags.verbose) {
+      if (opts.verbose) {
         print_partial_pqs(m, i, ref);
         Rcout << "next_min_tetrads: " << next_min_tetrads 
               << " next_defect_count: " << next_defect_count
@@ -609,8 +607,8 @@ void find_all_runs(
               << endl;
       }
       
-      if (flags.fast && i < 3 && res.max_scores[m[0].first - ref] > 0 && max_score <= res.max_scores[m[0].first - ref]) {
-        if (flags.verbose) {
+      if (opts.fast && i < 3 && res.max_scores[m[0].first - ref] > 0 && max_score <= res.max_scores[m[0].first - ref]) {
+        if (opts.verbose) {
           Rcout << "Skip search branch..." << endl;
         }
         continue;
@@ -620,7 +618,7 @@ void find_all_runs(
         // enforce G4 total length limit to be relative to the first G-run start
         find_all_runs(
           subject, i+1, e, min(s + opts.max_len, end), m, run_re_c, opts,
-          flags, sc, ref, len, pqs_storage, vec_cache, pqs_cnt, res,
+          sc, ref, len, pqs_storage, vec_cache, pqs_cnt, res,
           false, s_time, next_min_g_count, next_min_run_len, next_defect_count, fn_call_count
         );
       } else if (i < 3) {
@@ -629,7 +627,7 @@ void find_all_runs(
           return; // skip too long loops
         }
         find_all_runs(
-          subject, i+1, e, end, m, run_re_c, opts, flags, sc, ref, len,
+          subject, i+1, e, end, m, run_re_c, opts, sc, ref, len,
           pqs_storage, vec_cache, pqs_cnt, res,
           (loop_len == 0 ? true : zero_loop), s_time, next_min_g_count, next_min_run_len, next_defect_count, fn_call_count
         );
@@ -640,7 +638,7 @@ void find_all_runs(
         {
           pqs_cnt = 0;
           checkUserInterrupt();
-          if (!flags.verbose) {
+          if (!opts.verbose) {
             double percents = ceilf((m[0].first - ref)/(double)len*100);
             double e_seconds = chrono::duration_cast<std::chrono::seconds>(
               chrono::system_clock::now() - s_time).count();
@@ -658,10 +656,10 @@ void find_all_runs(
         }
         score = 0;
         features_t pqs_features;
-        if (flags.use_default_scoring) {
+        if (opts.use_default_scoring) {
           score = score_pqs(m, pqs_features, sc, opts);
         }
-        if ((score || !flags.use_default_scoring) && sc.custom_scoring_fn != NULL) {
+        if ((score || !opts.use_default_scoring) && sc.custom_scoring_fn != NULL) {
           check_custom_scoring_fn(score, m, sc, subject, ref);
         }
         if (score) {
@@ -680,7 +678,7 @@ void find_all_runs(
             for (int k = 0; k < pqs_len; ++k)
               ++vec_cache.density[k];
             
-            if (flags.verbose)
+            if (opts.verbose)
               print_pqs(m, score, ref);
           }
         }
@@ -716,20 +714,30 @@ storage &select_pqs_storage(
     return nov;
 }
 
+
+/**
+ * Find PQS that were missed during fast search
+ * 
+ * @param subject
+ * @param seq
+ * @param run_re_c
+ * @param sc
+ * @param opts
+ * @param res
+ * @param fn_call_count
+ */
 void find_overscored_pqs(
     SEXP subject,
     const string &seq,
     const boost::regex &run_re_c,
     const scoring &sc,
     const opts_t &opts,
-    const flags_t &flags,
-    vector<results::item_t> res_items,
     results &res,
     int &fn_call_count
 )
 {
-  if (flags.verbose) {
-    Rcout << "Find overshadowed pqs..." << endl;
+  if (opts.verbose) {
+    Rcout << "Find overscored pqs..." << endl;
   }
   
   run_match m[RUN_CNT];
@@ -740,37 +748,34 @@ void find_overscored_pqs(
   storage &pqs_storage = select_pqs_storage(opts.overlapping, ov_storage, nov_storage);
   
   // neccessary to have clean results object with zero max_scores vector
-  results neg_res(seq.length(), opts.min_score);
-  
-  flags_t new_flags(flags);
-  new_flags.debug = true;
+  results overscored_res(seq.length(), opts.min_score);
   
   string::const_iterator left_start, left_end, right_start, right_end, next_pqs_start, prev_pqs_end;
   
-  for (int i = 0; i < res_items.size(); ++i) {
+  for (int i = 0; i < res.items.size(); ++i) {
     
-    left_end = res_items[i].start - 1;
-    right_start = res_items[i].start + res_items[i].len - 1;
+    left_end = res.items[i].start - 1;
+    right_start = res.items[i].start + res.items[i].len - 1;
     
     if (i == 0) {
       left_start = max(left_end - opts.max_len, seq.begin());
     } else {
-      prev_pqs_end = res_items[i-1].start + res_items[i-1].len - 1;
+      prev_pqs_end = res.items[i-1].start + res.items[i-1].len - 1;
       left_start = max(left_end - opts.max_len, prev_pqs_end);
       if (left_start - prev_pqs_end < 50) {
         left_start = left_end; // do not search again
       }
     }
-    if (i == res_items.size() - 1) {
+    if (i == res.items.size() - 1) {
       right_end = min(right_start + opts.max_len, seq.end());
     } else {
-      next_pqs_start = res_items[i+1].start - 1;
+      next_pqs_start = res.items[i+1].start - 1;
       right_end = min(right_start + opts.max_len, next_pqs_start);
       if (next_pqs_start - right_end < opts.max_len) {
         right_end = next_pqs_start; // extend search region
       }
     }
-    if (flags.verbose) {
+    if (opts.verbose) {
       Rcout << "negative regions " <<
         left_start - seq.begin() + 1 << "-" <<
           left_end - seq.begin() << " " << 
@@ -782,28 +787,28 @@ void find_overscored_pqs(
       // search left negative neighbourhood for overshadowed pqs
       
       find_all_runs(
-        subject, 0, left_start, left_end, m, run_re_c, opts, new_flags, sc, 
+        subject, 0, left_start, left_end, m, run_re_c, opts, sc, 
         seq.begin(), seq.length(), pqs_storage,
-        vec_cache, pqs_cnt, neg_res, false, chrono::system_clock::now(),
+        vec_cache, pqs_cnt, overscored_res, false, chrono::system_clock::now(),
         INT_MAX, INT_MAX, 0, fn_call_count
       );
-      pqs_storage.export_pqs(neg_res);
+      pqs_storage.export_pqs(overscored_res);
     }
     if (right_end - right_start > opts.run_min_len * 4) {
       // search left negative neighbourhood for overshadowed pqs
       
       find_all_runs(
-        subject, 0, right_start, right_end, m, run_re_c, opts, new_flags, sc, 
+        subject, 0, right_start, right_end, m, run_re_c, opts, sc, 
         seq.begin(), seq.length(), pqs_storage,
-        vec_cache, pqs_cnt, neg_res, false, chrono::system_clock::now(),
+        vec_cache, pqs_cnt, overscored_res, false, chrono::system_clock::now(),
         INT_MAX, INT_MAX, 0, fn_call_count
       );
-      pqs_storage.export_pqs(neg_res);
+      pqs_storage.export_pqs(overscored_res);
     }
   }
   // copy results to global results
-  for (int i = 0; i < neg_res.items.size(); ++i) {
-    res.items.push_back(neg_res.items[i]);
+  for (int i = 0; i < overscored_res.items.size(); ++i) {
+    res.items.push_back(overscored_res.items[i]);
   }
 }
 
@@ -823,7 +828,6 @@ void prescan_pqs(
     const string &seq,
     const scoring &sc,
     const opts_t &opts,
-    const flags_t &flags,
     results &res)
 {
   run_match m[RUN_CNT];
@@ -846,7 +850,7 @@ void prescan_pqs(
     for (int k = 0; k < pqs_len; ++k) {
       res.max_scores[offset + k] = score;
     }
-    if (flags.verbose) {
+    if (opts.verbose) {
       Rcout << "prescanned PQS" << endl;
       print_pqs(m, score, seq.begin());
     }
@@ -859,22 +863,17 @@ void prescan_pqs(
  *
  * @param subject DNAString object
  * @param seq DNA sequence
- * @param strand Strand specification
  * @param run_re_c Run regular expression
- * @param ctable PQS cache table
  * @param sc Scoring options
  * @param opts Algorihtm options
- * @param flags Algorithm flags
  * @param res Results object
  */
 void find_pqs(
     SEXP subject,
     const string &seq,
-    const string strand,
     const boost::regex &run_re_c,
     const scoring &sc,
     const opts_t &opts,
-    const flags_t &flags,
     results &res)
 {
   run_match m[RUN_CNT];
@@ -886,13 +885,13 @@ void find_pqs(
   
   int fn_call_count = 0;
   
-  if (flags.prescan) {
-    prescan_pqs(seq, sc, opts, flags, res);
+  if (opts.prescan) {
+    prescan_pqs(seq, sc, opts, res);
   }
   
   // Global sequence length is the only limit for the first G-run
   find_all_runs(
-    subject, 0, seq.begin(), seq.end(), m, run_re_c, opts, flags, sc,
+    subject, 0, seq.begin(), seq.end(), m, run_re_c, opts, sc,
     seq.begin(), seq.length(), pqs_storage, vec_cache, pqs_cnt,
     res, false, chrono::system_clock::now(), INT_MAX, INT_MAX, 0, fn_call_count
   );
@@ -900,14 +899,12 @@ void find_pqs(
   
   Rcout << "first_fn_call_count: " << fn_call_count << endl;
   
-  if (flags.fast && !res.items.empty()) {
+  if (opts.fast && !res.items.empty()) {
     
-    vector<results::item_t> res_items(res.items);
-    sort(res_items.begin(), res_items.end(), cmp_res_item_by_start);
+    sort(res.items.begin(), res.items.end(), cmp_res_item_by_start);
     
     find_overscored_pqs(
-      subject, seq, run_re_c, sc, opts, flags,
-      res_items, res, fn_call_count
+      subject, seq, run_re_c, sc, opts, res, fn_call_count
     );
     
     Rcout << "second_fn_call_count: " << fn_call_count << endl;
@@ -1048,22 +1045,15 @@ SEXP pqsfinder(
 
   if (subject_class[0] != "DNAString")
     throw invalid_argument("Subject must be DNAString object.");
-
-  flags_t flags;
-  flags.use_re = false;
-  flags.use_prof = false;
-  flags.debug = false;
-  flags.verbose = verbose;
-  flags.use_default_scoring = use_default_scoring;
-  flags.fast = fast;
-  flags.prescan = prescan;
-
-  if (run_re != "G{1,10}.{0,9}G{1,10}") {
-    // User specified its own regexp, force to use regexp engine
-    flags.use_re = true;
-  }
-
+  
   opts_t opts;
+  opts.use_re = false;
+  opts.use_prof = false;
+  opts.debug = false;
+  opts.verbose = verbose;
+  opts.use_default_scoring = use_default_scoring;
+  opts.fast = fast;
+  opts.prescan = prescan;
   opts.overlapping = overlapping;
   opts.max_len = max_len;
   opts.min_score = min_score;
@@ -1072,15 +1062,20 @@ SEXP pqsfinder(
   opts.run_max_len = run_max_len;
   opts.run_min_len = run_min_len;
   
-  if (flags.use_re) {
+  if (run_re != "G{1,10}.{0,9}G{1,10}") {
+    // User specified its own regexp, force to use regexp engine
+    opts.use_re = true;
+  }
+  
+  if (opts.use_re) {
     opts.check_int_period = 1e6;
   } else {
     opts.check_int_period = 1e7;
   }
   if (opts.overlapping) {
     // cannot use optimization when searching for overlapping G4s
-    flags.fast = false;
-    flags.prescan = false;
+    opts.fast = false;
+    opts.prescan = false;
   }
   scoring sc;
   sc.tetrad_bonus = tetrad_bonus;
@@ -1103,16 +1098,16 @@ SEXP pqsfinder(
   results res_antisense(seq.length(), opts.min_score);
   boost::regex run_re_c(run_re);
 
-  if (flags.debug) {
+  if (opts.debug) {
     Rcout << "G-run regexp: " << run_re << endl;
-    Rcout << "Use regexp engine: " << flags.use_re << endl;
+    Rcout << "Use regexp engine: " << opts.use_re << endl;
     Rcout << "Input sequence length: " << seq.length() << endl;
     Rcout << "Use user fn: " << (custom_scoring_fn != R_NilValue) << endl;
   }
 
   if (custom_scoring_fn != R_NilValue) {
     sc.set_custom_scoring_fn(custom_scoring_fn);
-    if (flags.debug) {
+    if (opts.debug) {
       Rcout << "User function: " << endl;
       Function show("show");
       show(custom_scoring_fn);
@@ -1120,23 +1115,23 @@ SEXP pqsfinder(
   }
 
   #ifdef _GLIBCXX_DEBUG
-  if (flags.use_prof)
+  if (opts.use_prof)
     ProfilerStart("profiling.log");
   #endif
 
   if (strand == "+" || strand == "*") {
     Rcout << "Searching on sense strand..." << endl;
-    find_pqs(subject, seq, "+", run_re_c, sc, opts, flags, res_sense);
+    find_pqs(subject, seq, run_re_c, sc, opts, res_sense);
     Rcout << "Search status: finished              " << endl;
   }
   if (strand == "-" || strand == "*") {
     Rcout << "Searching on antisense strand..." << endl;
-    find_pqs(subject_rc, seq_rc, "-", run_re_c, sc, opts, flags, res_antisense);
+    find_pqs(subject_rc, seq_rc, run_re_c, sc, opts, res_antisense);
     Rcout << "Search status: finished              " << endl;
   }
 
   #ifdef _GLIBCXX_DEBUG
-  if (flags.use_prof)
+  if (opts.use_prof)
     ProfilerStop();
   #endif
   
