@@ -54,7 +54,8 @@
 #'   algorithm.
 #' @param fast Enable fast searching. This has some impact on maxScores and
 #'   density vectors.
-#' @param prescan Prescan string by regular expression to get quick score estimates
+#' @param prescan Prescan string by regular expression engine to get 
+#'   score estimates quickly.
 #' @param verbose Enables detailed output. Turn it on if you want to see all
 #'   possible PQS found at each positions and not just the best one. It is
 #'   highly recommended to use this option for debugging custom quadruplex

@@ -86,10 +86,10 @@ struct opts_t {
   int loop_min_len;
   int loop_max_len;
   int check_int_period;
+  bool verbose;
   bool overlapping;
   bool use_re;
   bool use_prof;
-  bool verbose;
   bool debug;
   bool use_default_scoring;
   bool fast;
@@ -965,7 +965,8 @@ void find_pqs(
 //'   algorithm.
 //' @param fast Enable fast searching. This has some impact on maxScores and
 //'   density vectors.
-//' @param prescan Prescan string by regular expression to get quick score estimates
+//' @param prescan Prescan string by regular expression engine to get 
+//'   score estimates quickly.
 //' @param verbose Enables detailed output. Turn it on if you want to see all
 //'   possible PQS found at each positions and not just the best one. It is
 //'   highly recommended to use this option for debugging custom quadruplex
