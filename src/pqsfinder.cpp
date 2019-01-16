@@ -16,7 +16,9 @@
 #include <cstdlib>
 #include <algorithm>
 #include <chrono>
+#include <thread>
 #include <boost/regex.hpp>
+#include <boost/thread.hpp>
 #ifdef _GLIBCXX_DEBUG
 #include <google/profiler.h>
 #endif
@@ -41,6 +43,7 @@ using namespace std;
 
 /*
  * TODO:
+ * - move ETTC computation to own function
  * - results joining
  * - sequence splitting to chunks
  * - multi-threading (turn off ETTC and calling R_check_user_interrupt) 
@@ -79,13 +82,15 @@ public:
 
 // algorithm options
 struct opts_t {
-  int max_len;
+  size_t max_len;
   int min_score;
   int run_min_len;
   int run_max_len;
   int loop_min_len;
   int loop_max_len;
   int check_int_period;
+  size_t threads;
+  size_t chunk_size;
   bool verbose;
   bool overlapping;
   bool use_re;
@@ -94,6 +99,15 @@ struct opts_t {
   bool use_default_scoring;
   bool fast;
   bool prescan;
+};
+
+
+// search progress description
+struct search_progress_t {
+  int seconds;
+  int minutes;
+  int hours;
+  double percents;
 };
 
 
@@ -486,6 +500,38 @@ void debug_s_e(
 
 
 /**
+ * Compute search progress
+ * 
+ * @param s Current position in the sequence
+ * @param ref The beginning of the sequence
+ * @param len Length of the sequence
+ * @param s_time Starting time
+ */
+inline search_progress_t search_progress(
+    const string::const_iterator s,
+    const string::const_iterator ref,
+    const size_t len,
+    const chrono::system_clock::time_point s_time)
+{
+  double percents = ceilf((s - ref)/(double)len*100);
+  double e_seconds = chrono::duration_cast<std::chrono::seconds>(
+    chrono::system_clock::now() - s_time).count();
+  double r_seconds = (e_seconds / percents) * (100 - percents);
+  int r_hours = r_seconds / 3600;
+  r_seconds -= r_hours * 3600;
+  int r_minutes = r_seconds / 60;
+  r_seconds -= r_minutes * 60;
+  
+  search_progress_t sp;
+  sp.seconds = r_seconds;
+  sp.minutes = r_minutes;
+  sp.hours = r_hours;
+  sp.percents = percents;
+  return sp;
+}
+
+
+/**
  * Recursively idetify 4 consecutive runs making quadruplex
  *
  * @param subject DNAString object
@@ -633,25 +679,18 @@ void find_all_runs(
         );
       } else {
         /* Check user interrupt after reasonable amount of PQS identified to react
-         * on important user signals. I.e. he might want to abort the computation. */
-        if (++pqs_cnt == opts.check_int_period)
+         * on important user signals. E.g. the user might want to abort the computation. */
+        if (opts.threads == 1 && ++pqs_cnt == opts.check_int_period)
         {
           pqs_cnt = 0;
           checkUserInterrupt();
+          
           if (!opts.verbose) {
-            double percents = ceilf((m[0].first - ref)/(double)len*100);
-            double e_seconds = chrono::duration_cast<std::chrono::seconds>(
-              chrono::system_clock::now() - s_time).count();
-            double r_seconds = (e_seconds / percents) * (100 - percents);
-            int r_hours = r_seconds / 3600;
-            r_seconds -= r_hours * 3600;
-            int r_minutes = r_seconds / 60;
-            r_seconds -= r_minutes * 60;
-            
+            search_progress_t sp = search_progress(m[0].first, ref, len, s_time);
             char buffer[10];
-            sprintf(buffer, "%02d:%02d:%02d", r_hours, r_minutes, (int) r_seconds);
+            sprintf(buffer, "%02d:%02d:%02d", sp.hours, sp.minutes, sp.seconds);
             
-            Rcout << "Search status: " << percents << "% ETTC " << string(buffer) << "\r" << flush;
+            Rcout << "Search status: " << sp.percents << "% ETTC " << string(buffer) << "\r" << flush;
           }
         }
         score = 0;
@@ -687,7 +726,7 @@ void find_all_runs(
     if (i == 0) {
       // add locally accumulated max scores to global max scores array
       res.save_density_and_max_scores(
-        s, ref, vec_cache.density, vec_cache.max_scores, opts.max_len);
+        s, vec_cache.density, vec_cache.max_scores, opts.max_len);
     }
     if (!found_any) {
       break;
@@ -719,7 +758,8 @@ storage &select_pqs_storage(
  * Find PQS that were missed during fast search
  * 
  * @param subject
- * @param seq
+ * @param seq_begin Beginning of DNA sequence
+ * @param seq_end End of DNA sequence
  * @param run_re_c
  * @param sc
  * @param opts
@@ -728,7 +768,8 @@ storage &select_pqs_storage(
  */
 void find_overscored_pqs(
     SEXP subject,
-    const string &seq,
+    const string::const_iterator seq_begin,
+    const string::const_iterator seq_end,
     const boost::regex &run_re_c,
     const scoring &sc,
     const opts_t &opts,
@@ -743,12 +784,12 @@ void find_overscored_pqs(
   run_match m[RUN_CNT];
   vector_cache vec_cache(opts.max_len);
   int pqs_cnt = 0;
-  overlapping_storage ov_storage(seq.begin());
-  revised_non_overlapping_storage nov_storage(seq.begin());
+  overlapping_storage ov_storage(seq_begin);
+  revised_non_overlapping_storage nov_storage(seq_begin);
   storage &pqs_storage = select_pqs_storage(opts.overlapping, ov_storage, nov_storage);
   
   // neccessary to have clean results object with zero max_scores vector
-  results overscored_res(seq.length(), opts.min_score);
+  results overscored_res(seq_end - seq_begin, opts.min_score, seq_begin);
   
   string::const_iterator left_start, left_end, right_start, right_end, next_pqs_start, prev_pqs_end;
   
@@ -758,7 +799,7 @@ void find_overscored_pqs(
     right_start = res.items[i].start + res.items[i].len - 1;
     
     if (i == 0) {
-      left_start = max(left_end - opts.max_len, seq.begin());
+      left_start = max(left_end - opts.max_len, seq_begin);
     } else {
       prev_pqs_end = res.items[i-1].start + res.items[i-1].len - 1;
       left_start = max(left_end - opts.max_len, prev_pqs_end);
@@ -767,7 +808,7 @@ void find_overscored_pqs(
       }
     }
     if (i == res.items.size() - 1) {
-      right_end = min(right_start + opts.max_len, seq.end());
+      right_end = min(right_start + opts.max_len, seq_end);
     } else {
       next_pqs_start = res.items[i+1].start - 1;
       right_end = min(right_start + opts.max_len, next_pqs_start);
@@ -777,10 +818,10 @@ void find_overscored_pqs(
     }
     if (opts.verbose) {
       Rcout << "negative regions " <<
-        left_start - seq.begin() + 1 << "-" <<
-          left_end - seq.begin() << " " << 
-            right_start - seq.begin() + 1 << "-" <<
-              right_end - seq.begin() <<  endl;
+        left_start - seq_begin + 1 << "-" <<
+          left_end - seq_begin << " " << 
+            right_start - seq_begin + 1 << "-" <<
+              right_end - seq_begin <<  endl;
     }
     
     if (left_end - left_start > opts.run_min_len * 4) {
@@ -788,7 +829,7 @@ void find_overscored_pqs(
       
       find_all_runs(
         subject, 0, left_start, left_end, m, run_re_c, opts, sc, 
-        seq.begin(), seq.length(), pqs_storage,
+        seq_begin, seq_end - seq_begin, pqs_storage,
         vec_cache, pqs_cnt, overscored_res, false, chrono::system_clock::now(),
         INT_MAX, INT_MAX, 0, fn_call_count
       );
@@ -799,7 +840,7 @@ void find_overscored_pqs(
       
       find_all_runs(
         subject, 0, right_start, right_end, m, run_re_c, opts, sc, 
-        seq.begin(), seq.length(), pqs_storage,
+        seq_begin, seq_end - seq_begin, pqs_storage,
         vec_cache, pqs_cnt, overscored_res, false, chrono::system_clock::now(),
         INT_MAX, INT_MAX, 0, fn_call_count
       );
@@ -811,6 +852,7 @@ void find_overscored_pqs(
     res.items.push_back(overscored_res.items[i]);
   }
 }
+
 
 /**
  * Compare results item by start coordinates
@@ -825,7 +867,8 @@ bool cmp_res_item_by_start(const results::item_t &a, const results::item_t &b)
 }
 
 void prescan_pqs(
-    const string &seq,
+    const string::const_iterator seq_begin,
+    const string::const_iterator seq_end,
     const scoring &sc,
     const opts_t &opts,
     results &res)
@@ -833,10 +876,10 @@ void prescan_pqs(
   run_match m[RUN_CNT];
   boost::regex pqs_re_c("(G{2,11}).{1,10}?(\\1).{1,10}?(\\1).{1,10}?(\\1)");
   boost::smatch boost_m;
-  string::const_iterator s = seq.begin();
+  string::const_iterator s = seq_begin;
   int score;
   
-  while (run_regex_search(s, seq.end(), boost_m, pqs_re_c)) {
+  while (run_regex_search(s, seq_end, boost_m, pqs_re_c)) {
     for (int i = 0; i < RUN_CNT; ++i) {
       m[i].first = boost_m[i+1].first;
       m[i].second = boost_m[i+1].second;
@@ -845,24 +888,73 @@ void prescan_pqs(
     score = score_pqs(m, pqs_features, sc, opts);
     
     int pqs_len = m[3].second - m[0].first;
-    int offset = m[0].first - seq.begin(); // for + strand only
+    int offset = m[0].first - seq_begin; // for + strand only
     
     for (int k = 0; k < pqs_len; ++k) {
       res.max_scores[offset + k] = score;
     }
     if (opts.verbose) {
       Rcout << "prescanned PQS" << endl;
-      print_pqs(m, score, seq.begin());
+      print_pqs(m, score, seq_begin);
     }
     s = boost_m[0].second;
   }
 }
 
+
+
+// sequence chunk
+struct seq_chunk_t {
+  string::const_iterator s;
+  string::const_iterator e;
+};
+
+
+/**
+ * Split sequence into individual chunks with sufficient overlap
+ * 
+ * @param seq DNA sequence
+ * @param opts Algorithm options
+ */
+vector<seq_chunk_t> split_seq_to_chunks(
+    const string &seq,
+    const opts_t &opts) 
+{
+  vector<seq_chunk_t> chunk_list;
+  
+  const size_t seq_len = seq.length();
+  const size_t chunk_count = seq_len / opts.chunk_size;
+  seq_chunk_t chunk;
+  
+  for (int i = 0; i < chunk_count; ++i) {
+    if (i == 0) {
+      chunk.s = seq.begin();
+    } else {
+      chunk.s = seq.begin() + i * opts.chunk_size - 2*opts.max_len;
+    }
+    if (i == chunk_count - 1) {
+      // extend the last chunk to the end of the sequence
+      chunk.e = seq.end();
+    } else {
+      chunk.e = seq.begin() + (i+1) * opts.chunk_size + 2*opts.max_len;
+    }
+    chunk_list.push_back(chunk);
+  }
+  if (chunk_count == 0) {
+    chunk.s = seq.begin();
+    chunk.e = seq.end();
+    chunk_list.push_back(chunk);
+  }
+  return chunk_list;
+}
+
+
 /**
  * Perform quadruplex search on given DNA sequence.
  *
  * @param subject DNAString object
- * @param seq DNA sequence
+ * @param seq_begin Beginning of DNA sequence
+ * @param seq_end End of DNA sequence
  * @param run_re_c Run regular expression
  * @param sc Scoring options
  * @param opts Algorihtm options
@@ -870,7 +962,8 @@ void prescan_pqs(
  */
 void find_pqs(
     SEXP subject,
-    const string &seq,
+    const string::const_iterator seq_begin,
+    const string::const_iterator seq_end,
     const boost::regex &run_re_c,
     const scoring &sc,
     const opts_t &opts,
@@ -879,20 +972,20 @@ void find_pqs(
   run_match m[RUN_CNT];
   vector_cache vec_cache(opts.max_len);
   int pqs_cnt = 0;
-  overlapping_storage ov_storage(seq.begin());
-  revised_non_overlapping_storage nov_storage(seq.begin());
+  overlapping_storage ov_storage(seq_begin);
+  revised_non_overlapping_storage nov_storage(seq_begin);
   storage &pqs_storage = select_pqs_storage(opts.overlapping, ov_storage, nov_storage);
   
   int fn_call_count = 0;
   
   if (opts.prescan) {
-    prescan_pqs(seq, sc, opts, res);
+    prescan_pqs(seq_begin, seq_end, sc, opts, res);
   }
   
   // Global sequence length is the only limit for the first G-run
   find_all_runs(
-    subject, 0, seq.begin(), seq.end(), m, run_re_c, opts, sc,
-    seq.begin(), seq.length(), pqs_storage, vec_cache, pqs_cnt,
+    subject, 0, seq_begin, seq_end, m, run_re_c, opts, sc,
+    seq_begin, seq_end - seq_begin, pqs_storage, vec_cache, pqs_cnt,
     res, false, chrono::system_clock::now(), INT_MAX, INT_MAX, 0, fn_call_count
   );
   pqs_storage.export_pqs(res);
@@ -904,10 +997,104 @@ void find_pqs(
     sort(res.items.begin(), res.items.end(), cmp_res_item_by_start);
     
     find_overscored_pqs(
-      subject, seq, run_re_c, sc, opts, res, fn_call_count
+      subject, seq_begin, seq_end, run_re_c, sc, opts, res, fn_call_count
     );
     
     Rcout << "second_fn_call_count: " << fn_call_count << endl;
+  }
+}
+
+
+void find_pqs_thread(
+    int tid,
+    int num_threads,
+    vector<seq_chunk_t> &chunk_list,
+    vector<results> &res_list,
+    SEXP subject,
+    const boost::regex &run_re_c,
+    const scoring &sc,
+    const opts_t &opts)
+{
+  cout << "Running thread " << tid << endl;
+  
+  for (int i = tid; i < chunk_list.size(); i += num_threads) {
+    cout << "Computing chunk " << i << " using thread " endl;
+    find_pqs(
+      subject,
+      chunk_list[i].s,
+      chunk_list[i].e,
+      run_re_c,
+      sc,
+      opts,
+      res_list[i]);
+  }
+}
+
+
+void merge_results(
+    vector<results> &res_list,
+    results &res
+)
+{
+  for (int i = 0; i < res_list.size(); ++i) {
+    sort(res.items.begin(), res.items.end(), cmp_res_item_by_start);
+    
+    for (int k = 0; k < res_list[i].items.size(); ++k) {
+      res.items.push_back(res_list[i].items[k]);
+    }
+  }
+}
+
+
+void find_pqs_parallel(
+    SEXP subject,
+    const string &seq,
+    const boost::regex &run_re_c,
+    const scoring &sc,
+    const opts_t &opts,
+    results &res)
+{
+  if (opts.threads == 1) {
+    find_pqs(subject, seq.begin(), seq.end(), run_re_c, sc, opts, res);
+  } else {
+    vector<seq_chunk_t> chunk_list = split_seq_to_chunks(seq, opts);
+    size_t num_threads = min(chunk_list.size(), opts.threads);
+    boost::thread *tt;
+    
+    boost::thread::attributes attrs;
+    attrs.set_stack_size(1024*1024*100);
+    std::cout << "Stack size: " << attrs.get_stack_size() << std::endl;
+     
+    for (int i = 0; i < chunk_list.size(); ++i) {
+      Rcout << "Chunk " << i << ": " <<
+        chunk_list[i].s - seq.begin() + 1 << "-" << chunk_list[i].e - seq.begin() << endl;
+    }
+    // initialize result objects
+    vector<results> res_list(chunk_list.size());
+    for (int i = 0; i < chunk_list.size(); ++i) {
+      res_list[i].init(chunk_list[i].e - chunk_list[i].s, opts.min_score, chunk_list[i].s);
+    }
+    if (num_threads > 1) {
+      // run additional threads
+      tt = new boost::thread[num_threads - 1];
+      for (int tid = 1; tid < num_threads; ++tid) {
+        tt[tid - 1] = boost::thread(
+          attrs, boost::bind(find_pqs_thread, tid, num_threads, std::ref(chunk_list), std::ref(res_list),
+          subject, std::ref(run_re_c), std::ref(sc), std::ref(opts))
+        );
+      }
+    }
+    // run main thread calculation
+    find_pqs_thread(0, num_threads, chunk_list, res_list, subject, run_re_c, sc, opts);
+    
+    if (num_threads > 1) {
+      // wait for additional threads
+      for (int tid = 1; tid < num_threads; ++tid) {
+        tt[tid - 1].join();
+      }
+      delete [] tt;
+    }
+    merge_results(res_list, res);
   }
 }
 
@@ -963,6 +1150,8 @@ void find_pqs(
 //'   default behavior and specify your own scoring function. By disabling the
 //'   default scoring you will get a full control above the underlying detection
 //'   algorithm.
+//' @param threads Number of threads that can be created by pqsfinder to
+//'   speed up the computation.
 //' @param fast Enable fast searching. This has some impact on maxScores and
 //'   density vectors.
 //' @param prescan Prescan string by regular expression engine to get 
@@ -1007,6 +1196,7 @@ SEXP pqsfinder(
     SEXP custom_scoring_fn = R_NilValue,
     bool use_default_scoring = true,
     bool fast = true,
+    int threads = 1,
     bool prescan = false,
     bool verbose = false)
 {
@@ -1062,12 +1252,17 @@ SEXP pqsfinder(
   opts.loop_min_len = loop_min_len;
   opts.run_max_len = run_max_len;
   opts.run_min_len = run_min_len;
+  opts.threads = threads;
+  opts.chunk_size = 100 * max_len;
   
+  if (threads > 1) {
+    // disable verbose mode
+    opts.verbose = false;
+  }
   if (run_re != "G{1,10}.{0,9}G{1,10}") {
     // User specified its own regexp, force to use regexp engine
     opts.use_re = true;
   }
-  
   if (opts.use_re) {
     opts.check_int_period = 1e6;
   } else {
@@ -1095,8 +1290,8 @@ SEXP pqsfinder(
   SEXP subject_rc = reverseComplement(subject);
   string seq_rc = as<string>(as_character(subject_rc));
 
-  results res_sense(seq.length(), opts.min_score);
-  results res_antisense(seq.length(), opts.min_score);
+  results res_sense(seq.length(), opts.min_score, seq.begin());
+  results res_antisense(seq_rc.length(), opts.min_score, seq_rc.begin());
   boost::regex run_re_c(run_re);
 
   if (opts.debug) {
@@ -1122,12 +1317,12 @@ SEXP pqsfinder(
 
   if (strand == "+" || strand == "*") {
     Rcout << "Searching on sense strand..." << endl;
-    find_pqs(subject, seq, run_re_c, sc, opts, res_sense);
+    find_pqs_parallel(subject, seq, run_re_c, sc, opts, res_sense);
     Rcout << "Search status: finished              " << endl;
   }
   if (strand == "-" || strand == "*") {
     Rcout << "Searching on antisense strand..." << endl;
-    find_pqs(subject_rc, seq_rc, run_re_c, sc, opts, res_antisense);
+    find_pqs_parallel(subject_rc, seq_rc, run_re_c, sc, opts, res_antisense);
     Rcout << "Search status: finished              " << endl;
   }
 

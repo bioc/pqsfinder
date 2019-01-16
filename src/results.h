@@ -34,27 +34,37 @@ public:
   };
   vector<results::item_t> items;
   
-  int *density;
-  int *max_scores;
+  int *density = NULL;
+  int *max_scores = NULL;
 
-  const int min_score;
-  const int seq_len;
-
-  results(const int seq_len, const int min_score) :
-    min_score(min_score), seq_len(seq_len)
+  size_t seq_len = 0;
+  int min_score = 1;
+  string::const_iterator ref;
+  
+  results() {
+    
+  }
+  results(const size_t seq_len, const int min_score, const string::const_iterator ref) :
+    seq_len(seq_len), min_score(min_score), ref(ref)
   {
-    this->density = (int *)calloc(seq_len, sizeof(int));
-    if (this->density == NULL)
-      throw runtime_error("Unable to allocate memory for results density vector.");
-    this->max_scores = (int *)calloc(seq_len, sizeof(int));
-    if (this->max_scores == NULL)
-      throw runtime_error("Unable to allocate memory for results score distribution vector.");
+    this->init(seq_len, min_score, ref);
   }
   ~results() {
     if (this->density != NULL)
       free(this->density);
     if (this->max_scores != NULL)
       free(this->max_scores);
+  }
+  void init(const size_t seq_len, const int min_score, const string::const_iterator ref) {
+    this->seq_len = seq_len;
+    this->min_score = min_score;
+    this->ref = ref;
+    this->density = (int *)calloc(seq_len, sizeof(int));
+    if (this->density == NULL)
+      throw runtime_error("Unable to allocate memory for results density vector.");
+    this->max_scores = (int *)calloc(seq_len, sizeof(int));
+    if (this->max_scores == NULL)
+      throw runtime_error("Unable to allocate memory for results score distribution vector.");
   }
   inline void save_pqs(
       const int score, const string::const_iterator &s,
@@ -80,10 +90,10 @@ public:
     }
   }
   inline void save_density_and_max_scores(
-      const string::const_iterator &s, const string::const_iterator &ref,
-      const int *density, const int *max_scores, const int max_len)
+      const string::const_iterator &s, const int *density,
+      const int *max_scores, const size_t max_len)
   {
-    int offset = s - ref;
+    int offset = s - this->ref;
     int k_limit = min(max_len, this->seq_len - offset);
     for (int k = 0; k < k_limit; ++k) {
       int i = offset + k;
@@ -91,10 +101,10 @@ public:
       this->max_scores[i] = max(this->max_scores[i], max_scores[k]);
     }
   }
-  inline void print(const string::const_iterator &ref) const {
+  inline void print() const {
     Rcout << "Results" << endl;
     for (unsigned i = 0; i < this->items.size(); i++) {
-      Rcout << "PQS[" << i << "]: " << this->items[i].start - ref + 1 << " "
+      Rcout << "PQS[" << i << "]: " << this->items[i].start - this->ref + 1 << " "
             << string(this->items[i].start, this->items[i].start + this->items[i].len)
             << " " << this->items[i].score << endl;
     }

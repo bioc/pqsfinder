@@ -12,8 +12,8 @@ pqsfinder(subject, strand = "*", overlapping = FALSE, max_len = 50L,
   bulge_len_factor = 0.2, bulge_len_exponent = 1,
   loop_mean_factor = 6.6, loop_mean_exponent = 0.8,
   run_re = "G{1,10}.{0,9}G{1,10}", custom_scoring_fn = NULL,
-  use_default_scoring = TRUE, fast = TRUE, prescan = FALSE,
-  verbose = FALSE)
+  use_default_scoring = TRUE, fast = TRUE, threads = 1L,
+  prescan = FALSE, verbose = FALSE)
 }
 \arguments{
 \item{subject}{DNAString object.}
@@ -82,6 +82,9 @@ algorithm.}
 
 \item{fast}{Enable fast searching. This has some impact on maxScores and
 density vectors.}
+
+\item{threads}{Number of threads that can be created by pqsfinder to
+speed up the computation.}
 
 \item{prescan}{Prescan string by regular expression engine to get 
 score estimates quickly.}

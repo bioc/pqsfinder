@@ -6,12 +6,12 @@ ifneq (,)
 This makefile requires GNU Make.
 endif
 
-bregex_src=${wildcard boost_regex/*.cpp}
-bregex_objs=${bregex_src:.cpp=.o}
+boost_src=${wildcard boost_regex/*.cpp} ${wildcard boost_thread/*.cpp} ${wildcard boost_thread/pthread/*.cpp}
+boost_objs=${boost_src:.cpp=.o}
 
-REGEXLIB = libboost_regex.a
+BOOSTLIB = libboost.a
 USERDIR = ${R_PACKAGE_DIR}/lib${R_ARCH}
-USERLIB = ${USERDIR}/${REGEXLIB}
+USERLIB = ${USERDIR}/${BOOSTLIB}
 
 CXX_STD = CXX11
 PKG_LIBS = "${USERLIB}"
@@ -23,9 +23,9 @@ all: $(SHLIB)
 
 $(SHLIB): $(USERLIB)
 
-$(USERLIB): ${bregex_objs}
+$(USERLIB): ${boost_objs}
 	mkdir -p "${USERDIR}"
-	$(AR) rs "${USERLIB}" ${bregex_objs}
+	$(AR) rs "${USERLIB}" ${boost_objs}
 
 clean:
 	rm -f $(OBJECTS) $(SHLIB)
