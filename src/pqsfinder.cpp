@@ -111,6 +111,13 @@ struct search_progress_t {
 };
 
 
+// sequence chunk
+struct seq_chunk_t {
+  string::const_iterator s;
+  string::const_iterator e;
+};
+
+
 // class representing one run from quadruplex
 class run_match {
 public:
@@ -256,6 +263,7 @@ inline int score_run_defects(
     return 0;
   }
 }
+
 
 /**
  * Score PQS.
@@ -652,14 +660,12 @@ void find_all_runs(
               << " max_score: " << max_score
               << endl;
       }
-      
       if (opts.fast && i < 3 && res.max_scores[m[0].first - ref] > 0 && max_score <= res.max_scores[m[0].first - ref]) {
         if (opts.verbose) {
           Rcout << "Skip search branch..." << endl;
         }
         continue;
       }
-      
       if (i == 0) {
         // enforce G4 total length limit to be relative to the first G-run start
         find_all_runs(
@@ -911,14 +917,6 @@ void prescan_pqs(
 }
 
 
-
-// sequence chunk
-struct seq_chunk_t {
-  string::const_iterator s;
-  string::const_iterator e;
-};
-
-
 /**
  * Split sequence into individual chunks with sufficient overlap
  * 
@@ -939,13 +937,13 @@ vector<seq_chunk_t> split_seq_to_chunks(
     if (i == 0) {
       chunk.s = seq.begin();
     } else {
-      chunk.s = seq.begin() + i * opts.chunk_size - opts.max_len;
+      chunk.s = seq.begin() + i * opts.chunk_size - 2*opts.max_len;
     }
     if (i == chunk_count - 1) {
       // extend the last chunk to the end of the sequence
       chunk.e = seq.end();
     } else {
-      chunk.e = seq.begin() + (i+1) * opts.chunk_size + opts.max_len;
+      chunk.e = seq.begin() + (i+1) * opts.chunk_size + 2*opts.max_len;
     }
     chunk_list.push_back(chunk);
   }
