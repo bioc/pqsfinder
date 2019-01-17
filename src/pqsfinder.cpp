@@ -82,7 +82,7 @@ public:
 
 // algorithm options
 struct opts_t {
-  size_t max_len;
+  int max_len;
   int min_score;
   int run_min_len;
   int run_max_len;
@@ -584,7 +584,6 @@ void find_all_runs(
 {
   string::const_iterator s, e, min_e;
   int score, loop_len;
-  vector_cache *cache_hit;
   bool found_any;
   int next_min_g_count;
   int next_min_run_len;
@@ -606,7 +605,7 @@ void find_all_runs(
     if (i == 0)
     {// specific code for the first run matching
       // reset density and score distribution
-      for (int k = 0; k < opts.max_len; ++k) {
+      for (size_t k = 0; k < opts.max_len; ++k) {
         vec_cache.density[k] = 0;
         vec_cache.max_scores[k] = 0;
       }
@@ -811,7 +810,7 @@ void find_overscored_pqs(
   
   string::const_iterator left_start, left_end, right_start, right_end, next_pqs_start, prev_pqs_end;
   
-  for (int i = 0; i < res.items.size(); ++i) {
+  for (size_t i = 0; i < res.items.size(); ++i) {
     
     left_end = res.items[i].start - 1;
     right_start = res.items[i].start + res.items[i].len - 1;
@@ -866,7 +865,7 @@ void find_overscored_pqs(
     }
   }
   // copy results to global results
-  for (int i = 0; i < overscored_res.items.size(); ++i) {
+  for (size_t i = 0; i < overscored_res.items.size(); ++i) {
     res.items.push_back(overscored_res.items[i]);
   }
 }
@@ -933,7 +932,7 @@ vector<seq_chunk_t> split_seq_to_chunks(
   const size_t chunk_count = seq_len / opts.chunk_size;
   seq_chunk_t chunk;
   
-  for (int i = 0; i < chunk_count; ++i) {
+  for (size_t i = 0; i < chunk_count; ++i) {
     if (i == 0) {
       chunk.s = seq.begin();
     } else {
@@ -1027,7 +1026,7 @@ void find_pqs_thread(
     const scoring &sc,
     const opts_t &opts)
 {
-  for (int i = tid; i < chunk_list.size(); i += num_threads) {
+  for (size_t i = tid; i < chunk_list.size(); i += num_threads) {
     find_pqs(
       subject,
       chunk_list[i].s,
@@ -1058,17 +1057,17 @@ void merge_results(
   revised_non_overlapping_storage nov_storage(seq_begin);
   storage &pqs_storage = select_pqs_storage(opts.overlapping, ov_storage, nov_storage);
   
-  for (int i = 0; i < res_list.size(); ++i) {
+  for (size_t i = 0; i < res_list.size(); ++i) {
     // sort partial results to have them in sequence order
     sort(res_list[i].items.begin(), res_list[i].items.end(), cmp_res_item_by_start);
     
     size_t offset = res_list[i].ref - seq_begin;
     
-    for (int k = 0; k < res_list[i].seq_len; ++k) {
+    for (size_t k = 0; k < res_list[i].seq_len; ++k) {
       res.max_scores[offset + k] = max(res.max_scores[offset + k], res_list[i].max_scores[k]);
       res.density[offset + k] = max(res.density[offset + k], res_list[i].density[k]);
     }
-    for (int k = 0; k < res_list[i].items.size(); ++k) {
+    for (size_t k = 0; k < res_list[i].items.size(); ++k) {
       features_t f;
       f.nt = res_list[i].items[k].nt;
       f.nb = res_list[i].items[k].nb;
@@ -1127,13 +1126,13 @@ void find_pqs_parallel(
     
     // initialize result objects
     vector<results> res_list(chunk_list.size());
-    for (int i = 0; i < chunk_list.size(); ++i) {
+    for (size_t i = 0; i < chunk_list.size(); ++i) {
       res_list[i].init(chunk_list[i].e - chunk_list[i].s, opts.min_score, chunk_list[i].s);
     }
     if (num_threads > 1) {
       // run additional threads
       tt = new boost::thread[num_threads - 1];
-      for (int tid = 1; tid < num_threads; ++tid) {
+      for (size_t tid = 1; tid < num_threads; ++tid) {
         tt[tid - 1] = boost::thread(
           attrs, boost::bind(find_pqs_thread, tid, num_threads, std::ref(chunk_list), std::ref(res_list),
           subject, std::ref(run_re_c), std::ref(sc), std::ref(opts))
@@ -1145,7 +1144,7 @@ void find_pqs_parallel(
     
     if (num_threads > 1) {
       // wait for additional threads
-      for (int tid = 1; tid < num_threads; ++tid) {
+      for (size_t tid = 1; tid < num_threads; ++tid) {
         tt[tid - 1].join();
       }
       delete [] tt;
