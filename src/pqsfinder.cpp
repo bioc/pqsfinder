@@ -582,7 +582,7 @@ void find_all_runs(
   int next_min_run_len;
   int next_defect_count;
   
-  fn_call_count++;
+  ++fn_call_count;
 
   if (i > 0) {
     loop_len = start - m[i-1].second;
@@ -755,6 +755,19 @@ storage &select_pqs_storage(
 
 
 /**
+ * Compare results item by start coordinates
+ * 
+ * @param a First item
+ * @param b Second item
+ * @return Is a lower than b?
+ */
+bool cmp_res_item_by_start(const results::item_t &a, const results::item_t &b)
+{
+  return a.start < b.start;
+}
+
+
+/**
  * Find PQS that were missed during fast search
  * 
  * @param subject
@@ -777,16 +790,15 @@ void find_overscored_pqs(
     int &fn_call_count
 )
 {
-  if (opts.verbose) {
-    Rcout << "Find overscored pqs..." << endl;
-  }
-  
   run_match m[RUN_CNT];
   vector_cache vec_cache(opts.max_len);
   int pqs_cnt = 0;
   overlapping_storage ov_storage(seq_begin);
   revised_non_overlapping_storage nov_storage(seq_begin);
   storage &pqs_storage = select_pqs_storage(opts.overlapping, ov_storage, nov_storage);
+  
+  // sort results to have them in sequence order
+  sort(res.items.begin(), res.items.end(), cmp_res_item_by_start);
   
   // neccessary to have clean results object with zero max_scores vector
   results overscored_res(seq_end - seq_begin, opts.min_score, seq_begin);
@@ -855,17 +867,14 @@ void find_overscored_pqs(
 
 
 /**
- * Compare results item by start coordinates
+ * Prescan sequence to find perfect G4s quickly (doesn't help much)
  * 
- * @param a First item
- * @param b Second item
- * @return Is a lower than b?
+ * @param seq_begin
+ * @param seq_end
+ * @param sc
+ * @param opts
+ * @param res
  */
-bool cmp_res_item_by_start(const results::item_t &a, const results::item_t &b)
-{
-  return a.start < b.start;
-}
-
 void prescan_pqs(
     const string::const_iterator seq_begin,
     const string::const_iterator seq_end,
@@ -930,13 +939,13 @@ vector<seq_chunk_t> split_seq_to_chunks(
     if (i == 0) {
       chunk.s = seq.begin();
     } else {
-      chunk.s = seq.begin() + i * opts.chunk_size - 2*opts.max_len;
+      chunk.s = seq.begin() + i * opts.chunk_size - opts.max_len;
     }
     if (i == chunk_count - 1) {
       // extend the last chunk to the end of the sequence
       chunk.e = seq.end();
     } else {
-      chunk.e = seq.begin() + (i+1) * opts.chunk_size + 2*opts.max_len;
+      chunk.e = seq.begin() + (i+1) * opts.chunk_size + opts.max_len;
     }
     chunk_list.push_back(chunk);
   }
@@ -990,21 +999,26 @@ void find_pqs(
   );
   pqs_storage.export_pqs(res);
   
-  Rcout << "first_fn_call_count: " << fn_call_count << endl;
-  
   if (opts.fast && !res.items.empty()) {
-    
-    sort(res.items.begin(), res.items.end(), cmp_res_item_by_start);
-    
     find_overscored_pqs(
       subject, seq_begin, seq_end, run_re_c, sc, opts, res, fn_call_count
     );
-    
-    Rcout << "second_fn_call_count: " << fn_call_count << endl;
   }
 }
 
 
+/**
+ * Single thread payload
+ * 
+ * @param tid
+ * @param num_threads
+ * @param chunk_list
+ * @param res_list
+ * @param subject
+ * @param run_re_c
+ * @param sc
+ * @param opts
+ */
 void find_pqs_thread(
     int tid,
     int num_threads,
@@ -1015,10 +1029,7 @@ void find_pqs_thread(
     const scoring &sc,
     const opts_t &opts)
 {
-  cout << "Running thread " << tid << endl;
-  
   for (int i = tid; i < chunk_list.size(); i += num_threads) {
-    cout << "Computing chunk " << i << " using thread " endl;
     find_pqs(
       subject,
       chunk_list[i].s,
@@ -1031,21 +1042,67 @@ void find_pqs_thread(
 }
 
 
+/**
+ * Merge results from different threads
+ * 
+ * @param seq_begin
+ * @param res_list
+ * @param res
+ * @param opts
+ */
 void merge_results(
+    const string::const_iterator seq_begin,
     vector<results> &res_list,
-    results &res
-)
+    results &res,
+    const opts_t &opts)
 {
+  overlapping_storage ov_storage(seq_begin);
+  revised_non_overlapping_storage nov_storage(seq_begin);
+  storage &pqs_storage = select_pqs_storage(opts.overlapping, ov_storage, nov_storage);
+  
   for (int i = 0; i < res_list.size(); ++i) {
-    sort(res.items.begin(), res.items.end(), cmp_res_item_by_start);
+    // sort partial results to have them in sequence order
+    sort(res_list[i].items.begin(), res_list[i].items.end(), cmp_res_item_by_start);
     
+    size_t offset = res_list[i].ref - seq_begin;
+    
+    for (int k = 0; k < res_list[i].seq_len; ++k) {
+      res.max_scores[offset + k] = max(res.max_scores[offset + k], res_list[i].max_scores[k]);
+      res.density[offset + k] = max(res.density[offset + k], res_list[i].density[k]);
+    }
     for (int k = 0; k < res_list[i].items.size(); ++k) {
-      res.items.push_back(res_list[i].items[k]);
+      features_t f;
+      f.nt = res_list[i].items[k].nt;
+      f.nb = res_list[i].items[k].nb;
+      f.nm = res_list[i].items[k].nm;
+      f.rl1 = res_list[i].items[k].rl1;
+      f.rl2 = res_list[i].items[k].rl2;
+      f.rl3 = res_list[i].items[k].rl3;
+      f.ll1 = res_list[i].items[k].ll1;
+      f.ll2 = res_list[i].items[k].ll2;
+      f.ll3 = res_list[i].items[k].ll3;
+      
+      pqs_storage.insert_pqs(
+        res_list[i].items[k].score,
+        res_list[i].items[k].start,
+        res_list[i].items[k].start + res_list[i].items[k].len,
+        f, res);
     }
   }
+  pqs_storage.export_pqs(res);
 }
 
 
+/**
+ * Possible split the PQS search between mutliple threads
+ * 
+ * @param subject
+ * @param seq
+ * @param run_re_c
+ * @param sc
+ * @param opts
+ * @param res
+ */
 void find_pqs_parallel(
     SEXP subject,
     const string &seq,
@@ -1058,17 +1115,18 @@ void find_pqs_parallel(
     find_pqs(subject, seq.begin(), seq.end(), run_re_c, sc, opts, res);
   } else {
     vector<seq_chunk_t> chunk_list = split_seq_to_chunks(seq, opts);
+    
     size_t num_threads = min(chunk_list.size(), opts.threads);
     boost::thread *tt;
     
     boost::thread::attributes attrs;
-    attrs.set_stack_size(1024*1024*100);
-    std::cout << "Stack size: " << attrs.get_stack_size() << std::endl;
+    //attrs.set_stack_size(1024*1024*100);
      
-    for (int i = 0; i < chunk_list.size(); ++i) {
-      Rcout << "Chunk " << i << ": " <<
-        chunk_list[i].s - seq.begin() + 1 << "-" << chunk_list[i].e - seq.begin() << endl;
-    }
+    // for (int i = 0; i < chunk_list.size(); ++i) {
+    //   Rcout << "Chunk " << i << ": " <<
+    //     chunk_list[i].s - seq.begin() + 1 << "-" << chunk_list[i].e - seq.begin() << endl;
+    // }
+    
     // initialize result objects
     vector<results> res_list(chunk_list.size());
     for (int i = 0; i < chunk_list.size(); ++i) {
@@ -1094,7 +1152,7 @@ void find_pqs_parallel(
       }
       delete [] tt;
     }
-    merge_results(res_list, res);
+    merge_results(seq.begin(), res_list, res, opts);
   }
 }
 
@@ -1253,7 +1311,7 @@ SEXP pqsfinder(
   opts.run_max_len = run_max_len;
   opts.run_min_len = run_min_len;
   opts.threads = threads;
-  opts.chunk_size = 100 * max_len;
+  opts.chunk_size = 500 * max_len;
   
   if (threads > 1) {
     // disable verbose mode
@@ -1396,6 +1454,7 @@ SEXP pqsfinder(
     res_max_scores[i] = max(res_sense.max_scores[i], res_antisense.max_scores[antisense_i]);
   }
   Function pqsviews("PQSViews");
+  
   return pqsviews(
     subject, res_start, res_width, res_strand, res_score,
     res_density, res_max_scores,

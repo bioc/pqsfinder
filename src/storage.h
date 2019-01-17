@@ -16,6 +16,7 @@
 using namespace Rcpp;
 using namespace std;
 
+
 class storage {
 public:
   virtual ~storage() {};
