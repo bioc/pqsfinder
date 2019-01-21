@@ -6,15 +6,15 @@ ifneq (,)
 This makefile requires GNU Make.
 endif
 
-boost_src=${wildcard boost_regex/*.cpp} ${wildcard boost_thread/*.cpp} ${wildcard boost_thread/pthread/*.cpp}
-boost_objs=${boost_src:.cpp=.o}
+BOOSTSRC=${wildcard boost_regex/*.cpp} ${wildcard boost_thread/*.cpp} ${wildcard boost_thread/pthread/*.cpp}
+BOOSTOBJS=${BOOSTSRC:.cpp=.o}
 
 BOOSTLIB = libboost.a
 USERDIR = ${R_PACKAGE_DIR}/lib${R_ARCH}
 USERLIB = ${USERDIR}/${BOOSTLIB}
 
 CXX_STD = CXX11
-PKG_LIBS = "${USERLIB}"
+PKG_LIBS = "${USERLIB}" -lprofiler
 # put CXX11FLAGS += -O0... into ~/.R/Makevars to override default gcc flags
 
 .PHONY: all clean 
@@ -23,9 +23,9 @@ all: $(SHLIB)
 
 $(SHLIB): $(USERLIB)
 
-$(USERLIB): ${boost_objs}
+$(USERLIB): ${BOOSTOBJS}
 	mkdir -p "${USERDIR}"
-	$(AR) rs "${USERLIB}" ${boost_objs}
+	$(AR) rs "${USERLIB}" ${BOOSTOBJS}
 
 clean:
-	rm -f $(boost_objs) $(SHLIB)
+	rm -f $(BOOSTOBJS) $(SHLIB)

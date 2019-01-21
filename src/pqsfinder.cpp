@@ -8,6 +8,8 @@
  * Package: pqsfinder
  */
 
+#define GPERF_ENABLED
+
 #include <Rcpp.h>
 #include <string>
 #include <climits>
@@ -19,8 +21,8 @@
 #include <thread>
 #include <boost/regex.hpp>
 #include <boost/thread.hpp>
-#ifdef _GLIBCXX_DEBUG
-#include <google/profiler.h>
+#ifdef GPERF_ENABLED
+#include <gperftools/profiler.h>
 #endif
 #include "results.h"
 #include "storage.h"
@@ -94,7 +96,6 @@ struct opts_t {
   bool verbose;
   bool overlapping;
   bool use_re;
-  bool use_prof;
   bool debug;
   bool use_default_scoring;
   bool fast;
@@ -605,7 +606,7 @@ void find_all_runs(
     if (i == 0)
     {// specific code for the first run matching
       // reset density and score distribution
-      for (size_t k = 0; k < opts.max_len; ++k) {
+      for (int k = 0; k < opts.max_len; ++k) {
         vec_cache.density[k] = 0;
         vec_cache.max_scores[k] = 0;
       }
@@ -1294,7 +1295,6 @@ SEXP pqsfinder(
   
   opts_t opts;
   opts.use_re = false;
-  opts.use_prof = false;
   opts.debug = false;
   opts.verbose = verbose;
   opts.use_default_scoring = use_default_scoring;
@@ -1365,8 +1365,7 @@ SEXP pqsfinder(
     }
   }
 
-  #ifdef _GLIBCXX_DEBUG
-  if (opts.use_prof)
+  #ifdef GPERF_ENABLED
     ProfilerStart("profiling.log");
   #endif
 
@@ -1381,8 +1380,7 @@ SEXP pqsfinder(
     Rcout << "Search status: finished              " << endl;
   }
 
-  #ifdef _GLIBCXX_DEBUG
-  if (opts.use_prof)
+  #ifdef GPERF_ENABLED
     ProfilerStop();
   #endif
   
