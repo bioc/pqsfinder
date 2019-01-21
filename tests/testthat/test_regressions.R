@@ -1,4 +1,6 @@
 context("Regressions")
+library(stringi)
+library(stringr)
 
 expect_equal_pv_vectors <- function(pv_a, pv_b) {
   expect_equal(maxScores(pv_a), maxScores(pv_b))
@@ -40,7 +42,6 @@ test_that("the result on test seq is the same as gives pqsfinder-1.4.4-patched",
   pv_r <- pqsfinder(test_seq, strand = "+", run_re = "G{1,10}.{0,10}G{1,10}", fast = TRUE)
   
   cat(" compare pv_d, pv_r\n")
-  #expect_equal_pv_vectors(pv_d, pv_r)
   expect_no_overlaps(pv_d)
   expect_no_overlaps(pv_r)
   
@@ -66,6 +67,8 @@ test_that("fast computation give same pqs as original slow one on real test_seq"
   expect_no_overlaps(pv_slow_p)
   expect_no_overlaps(pv_slow_m)
   
+  # expect_equal_pv_vectors(pv_slow, pqsfinder_1_4_4_patched_d)
+  
   pv_i <- pv_fast[start(pv_fast) %in% start(pv_slow)]
   expect_equal_pv_coords(pv_i, pv_slow)
 })
@@ -79,7 +82,6 @@ test_that("there no overshadowing", {
 })
 
 test_that("maxScores vector is a max of maxScores on sense and antisense", {
-  library(stringi)
   test_seq <- DNAString(stri_rand_shuffle(strrep("ACCGGT", 1000)))
   pv <- pqsfinder(test_seq)
   pv_p <- pqsfinder(test_seq, strand = "+")
@@ -88,7 +90,6 @@ test_that("maxScores vector is a max of maxScores on sense and antisense", {
 })
 
 test_that("density vector is a sum of density on sense and antisense", {
-  library(stringi)
   test_seq <- DNAString(stri_rand_shuffle(strrep("ACCGGT", 1000)))
   pv <- pqsfinder(test_seq)
   pv_p <- pqsfinder(test_seq, strand = "+")
@@ -96,10 +97,19 @@ test_that("density vector is a sum of density on sense and antisense", {
   expect_equal(density(pv), density(pv_p) + density(pv_m))
 })
 
+test_that("results are the same for slow and fast computation on random string", {
+  test_seq <- DNAString(stri_rand_shuffle(strrep("ACCGGT", 1000)))
+  
+  pv_fast <- pqsfinder(test_seq, fast = TRUE)
+  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  
+  expect_no_overlaps(pv_fast)
+  expect_no_overlaps(pv_slow)
+  
+  expect_equal_pv_coords(pv_fast, pv_slow)
+})
+
 test_that("sequences pqs parts can be extracted", {
-  
-  library(stringr)
-  
   test_seq <- DNAString("GGGTAGTGGTTTTGGGTTTGGGAAAAAAAAAAAAAAGGGTTTGGAGGAAATTTGGGGAGGGG")
   pv <- pqsfinder(test_seq, strand = "+")
   pv_m <- elementMetadata(pv)

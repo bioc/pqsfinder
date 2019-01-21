@@ -8,7 +8,7 @@
  * Package: pqsfinder
  */
 
-#define GPERF_ENABLED
+// #define GPERF_ENABLED
 
 #include <Rcpp.h>
 #include <string>
@@ -45,10 +45,6 @@ using namespace std;
 
 /*
  * TODO:
- * - move ETTC computation to own function
- * - results joining
- * - sequence splitting to chunks
- * - multi-threading (turn off ETTC and calling R_check_user_interrupt) 
  */
 
 
@@ -128,30 +124,6 @@ public:
   int length() const {
     return second - first;
   };
-};
-
-
-// class for caching regional max scores and density
-class vector_cache {
-public:
-  int *max_scores;
-  int *density;
-  
-  vector_cache(const int seq_len)
-  {
-    this->density = (int *)calloc(seq_len, sizeof(int));
-    if (this->density == NULL)
-      throw runtime_error("Unable to allocate memory for density vector.");
-    this->max_scores = (int *)calloc(seq_len, sizeof(int));
-    if (this->max_scores == NULL)
-      throw runtime_error("Unable to allocate memory for vector of maximum scores.");
-  }
-  ~vector_cache() {
-    if (this->density != NULL)
-      free(this->density);
-    if (this->max_scores != NULL)
-      free(this->max_scores);
-  }
 };
 
 
@@ -573,7 +545,6 @@ void find_all_runs(
     const string::const_iterator &ref,
     const size_t len,
     storage &pqs_storage,
-    vector_cache &vec_cache,
     int &pqs_cnt,
     results &res,
     bool zero_loop,
@@ -603,14 +574,6 @@ void find_all_runs(
   
   for (s = start; s < end; ++s)
   {
-    if (i == 0)
-    {// specific code for the first run matching
-      // reset density and score distribution
-      for (int k = 0; k < opts.max_len; ++k) {
-        vec_cache.density[k] = 0;
-        vec_cache.max_scores[k] = 0;
-      }
-    }
     min_e = s + opts.run_min_len;
     found_any = false;
 
@@ -660,7 +623,9 @@ void find_all_runs(
               << " max_score: " << max_score
               << endl;
       }
-      if (opts.fast && i < 3 && res.max_scores[m[0].first - ref] > 0 && max_score <= res.max_scores[m[0].first - ref]) {
+      if (opts.fast && i < 3 &&
+          (max_score < res.max_scores[m[0].first - ref] || max_score < opts.min_score)) {
+        // comparison to min_score helps also quite a lot (2-3x speedup for default min_score)
         if (opts.verbose) {
           Rcout << "Skip search branch..." << endl;
         }
@@ -670,7 +635,7 @@ void find_all_runs(
         // enforce G4 total length limit to be relative to the first G-run start
         find_all_runs(
           subject, i+1, e, min(s + opts.max_len, end), m, run_re_c, opts,
-          sc, ref, len, pqs_storage, vec_cache, pqs_cnt, res,
+          sc, ref, len, pqs_storage, pqs_cnt, res,
           false, s_time, next_min_g_count, next_min_run_len, next_defect_count, fn_call_count
         );
       } else if (i < 3) {
@@ -680,7 +645,7 @@ void find_all_runs(
         }
         find_all_runs(
           subject, i+1, e, end, m, run_re_c, opts, sc, ref, len,
-          pqs_storage, vec_cache, pqs_cnt, res,
+          pqs_storage, pqs_cnt, res,
           (loop_len == 0 ? true : zero_loop), s_time, next_min_g_count, next_min_run_len, next_defect_count, fn_call_count
         );
       } else {
@@ -707,32 +672,21 @@ void find_all_runs(
         if ((score || !opts.use_default_scoring) && sc.custom_scoring_fn != NULL) {
           check_custom_scoring_fn(score, m, sc, subject, ref);
         }
-        if (score) {
-          int pqs_len = m[3].second - m[0].first;
+        if (score >= opts.min_score) {
+          // current PQS satisfied all constraints
+          pqs_storage.insert_pqs(score, m[0].first, m[3].second, pqs_features, res);
           
-          int offset = m[0].first - ref; // for + strand only
+          int pqs_len = m[3].second - m[0].first;
+          int offset = m[0].first - ref;
           
           for (int k = 0; k < pqs_len; ++k) {
-            vec_cache.max_scores[k] = max(vec_cache.max_scores[k], score);
             res.max_scores[offset + k] = max(res.max_scores[offset + k], score);
+            ++res.density[offset + k];
           }
-          if (score >= opts.min_score) {
-            // current PQS satisfied all constraints
-            pqs_storage.insert_pqs(score, m[0].first, m[3].second, pqs_features, res);
-            
-            for (int k = 0; k < pqs_len; ++k)
-              ++vec_cache.density[k];
-            
-            if (opts.verbose)
-              print_pqs(m, score, ref);
-          }
+          if (opts.verbose)
+            print_pqs(m, score, ref);
         }
       }
-    }
-    if (i == 0) {
-      // add locally accumulated max scores to global max scores array
-      res.save_density_and_max_scores(
-        s, vec_cache.density, vec_cache.max_scores, opts.max_len);
     }
     if (!found_any) {
       break;
@@ -797,7 +751,6 @@ void find_overscored_pqs(
 )
 {
   run_match m[RUN_CNT];
-  vector_cache vec_cache(opts.max_len);
   int pqs_cnt = 0;
   overlapping_storage ov_storage(seq_begin);
   revised_non_overlapping_storage nov_storage(seq_begin);
@@ -848,7 +801,7 @@ void find_overscored_pqs(
       find_all_runs(
         subject, 0, left_start, left_end, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
-        vec_cache, pqs_cnt, overscored_res, false, chrono::system_clock::now(),
+        pqs_cnt, overscored_res, false, chrono::system_clock::now(),
         INT_MAX, INT_MAX, 0, fn_call_count
       );
       pqs_storage.export_pqs(overscored_res);
@@ -859,7 +812,7 @@ void find_overscored_pqs(
       find_all_runs(
         subject, 0, right_start, right_end, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
-        vec_cache, pqs_cnt, overscored_res, false, chrono::system_clock::now(),
+        pqs_cnt, overscored_res, false, chrono::system_clock::now(),
         INT_MAX, INT_MAX, 0, fn_call_count
       );
       pqs_storage.export_pqs(overscored_res);
@@ -977,7 +930,6 @@ void find_pqs(
     results &res)
 {
   run_match m[RUN_CNT];
-  vector_cache vec_cache(opts.max_len);
   int pqs_cnt = 0;
   overlapping_storage ov_storage(seq_begin);
   revised_non_overlapping_storage nov_storage(seq_begin);
@@ -992,7 +944,7 @@ void find_pqs(
   // Global sequence length is the only limit for the first G-run
   find_all_runs(
     subject, 0, seq_begin, seq_end, m, run_re_c, opts, sc,
-    seq_begin, seq_end - seq_begin, pqs_storage, vec_cache, pqs_cnt,
+    seq_begin, seq_end - seq_begin, pqs_storage, pqs_cnt,
     res, false, chrono::system_clock::now(), INT_MAX, INT_MAX, 0, fn_call_count
   );
   pqs_storage.export_pqs(res);

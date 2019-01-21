@@ -89,18 +89,6 @@ public:
       this->items.push_back(item);
     }
   }
-  inline void save_density_and_max_scores(
-      const string::const_iterator &s, const int *density,
-      const int *max_scores, const size_t max_len)
-  {
-    int offset = s - this->ref;
-    int k_limit = min(max_len, this->seq_len - offset);
-    for (int k = 0; k < k_limit; ++k) {
-      int i = offset + k;
-      this->density[i] += density[k];
-      this->max_scores[i] = max(this->max_scores[i], max_scores[k]);
-    }
-  }
   inline void print() const {
     Rcout << "Results" << endl;
     for (unsigned i = 0; i < this->items.size(); i++) {
