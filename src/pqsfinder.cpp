@@ -534,7 +534,7 @@ inline search_progress_t search_progress(
  * @param s_time Starting time
  */
 void find_all_runs(
-    SEXP subject,
+    const SEXP subject,
     const int i,
     string::const_iterator start,
     string::const_iterator end,
@@ -548,7 +548,7 @@ void find_all_runs(
     int &pqs_cnt,
     results &res,
     bool zero_loop,
-    chrono::system_clock::time_point s_time,
+    const chrono::system_clock::time_point s_time,
     int min_g_count,
     int min_run_len,
     int defect_count,
@@ -571,12 +571,13 @@ void find_all_runs(
       start = min(m[i-1].second + 1, end); // only one zero-length loop is allowed
     }
   }
-  
+  // primary loop moving G-run starting position to the right
   for (s = start; s < end; ++s)
   {
     min_e = s + opts.run_min_len;
     found_any = false;
 
+    // secondary loop moving G-run ending position to the left
     for (e = end; e >= min_e && find_run(s, e, m[i], run_re_c, opts); e--)
     {
       found_any = true;
@@ -649,7 +650,7 @@ void find_all_runs(
           (loop_len == 0 ? true : zero_loop), s_time, next_min_g_count, next_min_run_len, next_defect_count, fn_call_count
         );
       } else {
-        /* Check user interrupt after reasonable amount of PQS identified to react
+        /* Check user interrupt after reasonable amount of PQS scored to react
          * on important user signals. E.g. the user might want to abort the computation. */
         if (opts.threads == 1 && ++pqs_cnt == opts.check_int_period)
         {
