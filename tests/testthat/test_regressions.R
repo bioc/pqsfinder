@@ -14,6 +14,7 @@ expect_equal_pv_coords <- function(pv_a, pv_b) {
   expect_equal(score(pv_a), score(pv_b))
 }
 
+# only works for single strand search outputs
 expect_no_overlaps <- function(pv) {
   cnts <- numeric(length(subject(pv)))
   st <- start(pv)
@@ -100,11 +101,8 @@ test_that("density vector is a sum of density on sense and antisense", {
 test_that("results are the same for slow and fast computation on random string", {
   test_seq <- DNAString(stri_rand_shuffle(strrep("ACCGGT", 1000)))
   
-  pv_fast <- pqsfinder(test_seq, fast = TRUE)
-  pv_slow <- pqsfinder(test_seq, fast = FALSE)
-  
-  expect_no_overlaps(pv_fast)
-  expect_no_overlaps(pv_slow)
+  system.time(pv_fast <- pqsfinder(test_seq, fast = TRUE))
+  system.time(pv_slow <- pqsfinder(test_seq, fast = FALSE))
   
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
