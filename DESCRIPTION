@@ -1,12 +1,14 @@
 Package: pqsfinder
 Type: Package
 Title: Identification of potential quadruplex forming sequences
-Version: 1.11.0
+Version: 1.99.0
 Date: 2017-04-12
 Authors@R: c(person("Jiri", "Hon", role = c("aut", "cre"), email =
-        "jiri.hon@gmail.com"), person("Tomas", "Martinek", role =
-        "aut", email = "martinto@fit.vutbr.cz"), person("Matej",
-        "Lexa", role = "aut", email = "lexa@fi.muni.cz"))
+        "jiri.hon@gmail.com"), person("Dominika", "Labudova",
+        role = "aut", email = "d.labudova@gmail.com"),
+        person("Tomas", "Martinek", role = "aut", email =
+        "martinto@fit.vutbr.cz"), person("Matej", "Lexa",
+        role = "aut", email = "lexa@fi.muni.cz"))
 Author: Jiri Hon, Matej Lexa and Tomas Martinek
 Maintainer: Jiri Hon <jiri.hon@gmail.com>
 Description: The main functionality of this package is to detect
