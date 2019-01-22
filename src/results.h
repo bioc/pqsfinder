@@ -16,6 +16,8 @@
 using namespace Rcpp;
 using namespace std;
 
+static const size_t MAX_VECTOR_LENGTH = 100000;
+
 class results {
 public:
   struct item_t {
@@ -59,12 +61,15 @@ public:
     this->seq_len = seq_len;
     this->min_score = min_score;
     this->ref = ref;
+    
     this->density = (int *)calloc(seq_len, sizeof(int));
-    if (this->density == NULL)
+    if (this->density == NULL) {
       throw runtime_error("Unable to allocate memory for results density vector.");
+    }
     this->max_scores = (int *)calloc(seq_len, sizeof(int));
-    if (this->max_scores == NULL)
+    if (this->max_scores == NULL) {
       throw runtime_error("Unable to allocate memory for results score distribution vector.");
+    }
   }
   inline void save_pqs(
       const int score, const string::const_iterator &s,
