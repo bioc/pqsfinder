@@ -95,7 +95,6 @@ struct opts_t {
   bool debug;
   bool use_default_scoring;
   bool fast;
-  bool prescan;
 };
 
 
@@ -589,22 +588,6 @@ void find_all_runs(
       next_min_run_len = min(min_run_len, m[i].length());
       next_defect_count = defect_count + (m[i].length() != m[i].g_count);
       
-      if (opts.prescan && i == 0) {
-        int max_total_g_count = 0;
-        string::const_iterator pqs_max_end = min(s + opts.max_len, end);
-        
-        for (string::const_iterator temp_s = s; temp_s < pqs_max_end; ++temp_s) {
-          if (*temp_s == 'G') {
-            ++max_total_g_count;
-          }
-        }
-        int max_tetrads = max_total_g_count / 4;
-        if (opts.verbose) {
-          Rcout << "-------" << endl << "max_tetrads: " << max_tetrads << endl;
-        }
-        next_min_g_count = min(next_min_g_count, max_tetrads);
-      }
-      
       int next_min_tetrads;
       if (next_min_run_len == next_min_g_count + 1) {
         // correction for mismatch
@@ -827,51 +810,6 @@ void find_overscored_pqs(
 
 
 /**
- * Prescan sequence to find perfect G4s quickly (doesn't help much)
- * 
- * @param seq_begin
- * @param seq_end
- * @param sc
- * @param opts
- * @param res
- */
-void prescan_pqs(
-    const string::const_iterator seq_begin,
-    const string::const_iterator seq_end,
-    const scoring &sc,
-    const opts_t &opts,
-    results &res)
-{
-  run_match m[RUN_CNT];
-  boost::regex pqs_re_c("(G{2,11}).{1,10}?(\\1).{1,10}?(\\1).{1,10}?(\\1)");
-  boost::smatch boost_m;
-  string::const_iterator s = seq_begin;
-  int score;
-  
-  while (run_regex_search(s, seq_end, boost_m, pqs_re_c)) {
-    for (int i = 0; i < RUN_CNT; ++i) {
-      m[i].first = boost_m[i+1].first;
-      m[i].second = boost_m[i+1].second;
-    }
-    features_t pqs_features;
-    score = score_pqs(m, pqs_features, sc, opts);
-    
-    int pqs_len = m[3].second - m[0].first;
-    int offset = m[0].first - seq_begin; // for + strand only
-    
-    for (int k = 0; k < pqs_len; ++k) {
-      res.max_scores[offset + k] = score;
-    }
-    if (opts.verbose) {
-      Rcout << "prescanned PQS" << endl;
-      print_pqs(m, score, seq_begin);
-    }
-    s = boost_m[0].second;
-  }
-}
-
-
-/**
  * Split sequence into individual chunks with sufficient overlap
  * 
  * @param seq DNA sequence
@@ -937,10 +875,6 @@ void find_pqs(
   storage &pqs_storage = select_pqs_storage(opts.overlapping, ov_storage, nov_storage);
   
   int fn_call_count = 0;
-  
-  if (opts.prescan) {
-    prescan_pqs(seq_begin, seq_end, sc, opts, res);
-  }
   
   // Global sequence length is the only limit for the first G-run
   find_all_runs(
@@ -1163,8 +1097,6 @@ void find_pqs_parallel(
 //'   speed up the computation.
 //' @param fast Enable fast searching. This has some impact on maxScores and
 //'   density vectors.
-//' @param prescan Prescan string by regular expression engine to get 
-//'   score estimates quickly.
 //' @param verbose Enables detailed output. Turn it on if you want to see all
 //'   possible PQS found at each positions and not just the best one. It is
 //'   highly recommended to use this option for debugging custom quadruplex
@@ -1206,7 +1138,6 @@ SEXP pqsfinder(
     bool use_default_scoring = true,
     bool fast = true,
     int threads = 1,
-    bool prescan = false,
     bool verbose = false)
 {
   if (max_len < 1)
@@ -1252,7 +1183,6 @@ SEXP pqsfinder(
   opts.verbose = verbose;
   opts.use_default_scoring = use_default_scoring;
   opts.fast = fast;
-  opts.prescan = prescan;
   opts.overlapping = overlapping;
   opts.max_len = max_len;
   opts.min_score = min_score;
@@ -1279,7 +1209,6 @@ SEXP pqsfinder(
   if (opts.overlapping) {
     // cannot use optimization when searching for overlapping G4s
     opts.fast = false;
-    opts.prescan = false;
   }
   scoring sc;
   sc.tetrad_bonus = tetrad_bonus;
