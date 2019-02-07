@@ -548,17 +548,16 @@ void find_all_runs(
     results &res,
     bool zero_loop,
     const chrono::system_clock::time_point s_time,
-    int min_g_count,
-    int min_run_len,
+    int tetrad_count,
     int defect_count,
     int &fn_call_count)
 {
   string::const_iterator s, e, min_e;
   int score, loop_len;
   bool found_any;
-  int next_min_g_count;
-  int next_min_run_len;
+  int next_tetrad_count;
   int next_defect_count;
+  int max_score;
   
   ++fn_call_count;
 
@@ -584,43 +583,42 @@ void find_all_runs(
       s = string::const_iterator(m[i].first);
       e = string::const_iterator(m[i].second);
       
-      next_min_g_count = min(min_g_count, m[i].g_count);
-      next_min_run_len = min(min_run_len, m[i].length());
-      next_defect_count = defect_count + (m[i].length() != m[i].g_count);
-      
-      int next_min_tetrads;
-      if (next_min_run_len == next_min_g_count + 1) {
-        // correction for mismatch
-        next_min_tetrads = next_min_g_count + 1;
-      } else {
-        next_min_tetrads = next_min_g_count;
-      }
-      
-      int max_score = (next_min_tetrads - 1) * sc.tetrad_bonus
-        - next_defect_count * min(sc.bulge_penalty, sc.mismatch_penalty);
-      
-      if (opts.verbose) {
-        print_partial_pqs(m, i, ref);
-        Rcout << "next_min_tetrads: " << next_min_tetrads 
-              << " next_defect_count: " << next_defect_count
-              << " max_scores[0]: " << res.max_scores[m[0].first - ref]
-              << " max_score: " << max_score
-              << endl;
-      }
-      if (opts.fast && i < 3 &&
-          (max_score < res.max_scores[m[0].first - ref] || max_score < opts.min_score)) {
-        // comparison to min_score helps also quite a lot (2-3x speedup for default min_score)
-        if (opts.verbose) {
-          Rcout << "Skip search branch..." << endl;
+      if (opts.fast && i < 3) {
+        
+        if (m[i].length() == m[i].g_count + 1) {
+          // might be a run containing mismatch
+          next_tetrad_count = min(tetrad_count, m[i].length());
+        } else {
+          // perfect or bulged run
+          next_tetrad_count = min(tetrad_count, m[i].g_count);
         }
-        continue;
+        next_defect_count = defect_count + (m[i].length() != m[i].g_count);
+        
+        max_score = (next_tetrad_count - 1) * sc.tetrad_bonus
+          - next_defect_count * min(sc.bulge_penalty, sc.mismatch_penalty);
+        
+        if (opts.verbose) {
+          print_partial_pqs(m, i, ref);
+          Rcout << "next_tetrad_count: " << next_tetrad_count 
+                << " next_defect_count: " << next_defect_count
+                << " max_scores[0]: " << res.max_scores[m[0].first - ref]
+                << " max_score: " << max_score
+                << endl;
+        }
+        if ((max_score < res.max_scores[m[0].first - ref] || max_score < opts.min_score)) {
+          // comparison to min_score helps also quite a lot (2-3x speedup for default min_score)
+          if (opts.verbose) {
+            Rcout << "Skip search branch..." << endl;
+          }
+          continue;
+        }
       }
       if (i == 0) {
         // enforce G4 total length limit to be relative to the first G-run start
         find_all_runs(
           subject, i+1, e, min(s + opts.max_len, end), m, run_re_c, opts,
           sc, ref, len, pqs_storage, pqs_cnt, res,
-          false, s_time, next_min_g_count, next_min_run_len, next_defect_count, fn_call_count
+          false, s_time, next_tetrad_count, next_defect_count, fn_call_count
         );
       } else if (i < 3) {
         loop_len = s - m[i-1].second;
@@ -630,7 +628,7 @@ void find_all_runs(
         find_all_runs(
           subject, i+1, e, end, m, run_re_c, opts, sc, ref, len,
           pqs_storage, pqs_cnt, res,
-          (loop_len == 0 ? true : zero_loop), s_time, next_min_g_count, next_min_run_len, next_defect_count, fn_call_count
+          (loop_len == 0 ? true : zero_loop), s_time, next_tetrad_count, next_defect_count, fn_call_count
         );
       } else {
         /* Check user interrupt after reasonable amount of PQS scored to react
@@ -786,7 +784,7 @@ void find_overscored_pqs(
         subject, 0, left_start, left_end, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
         pqs_cnt, overscored_res, false, chrono::system_clock::now(),
-        INT_MAX, INT_MAX, 0, fn_call_count
+        INT_MAX, 0, fn_call_count
       );
       pqs_storage.export_pqs(overscored_res);
     }
@@ -797,7 +795,7 @@ void find_overscored_pqs(
         subject, 0, right_start, right_end, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
         pqs_cnt, overscored_res, false, chrono::system_clock::now(),
-        INT_MAX, INT_MAX, 0, fn_call_count
+        INT_MAX, 0, fn_call_count
       );
       pqs_storage.export_pqs(overscored_res);
     }
@@ -880,7 +878,7 @@ void find_pqs(
   find_all_runs(
     subject, 0, seq_begin, seq_end, m, run_re_c, opts, sc,
     seq_begin, seq_end - seq_begin, pqs_storage, pqs_cnt,
-    res, false, chrono::system_clock::now(), INT_MAX, INT_MAX, 0, fn_call_count
+    res, false, chrono::system_clock::now(), INT_MAX, 0, fn_call_count
   );
   pqs_storage.export_pqs(res);
   
