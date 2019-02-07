@@ -107,6 +107,17 @@ test_that("results are the same for slow and fast computation on random string",
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
 
+test_that("results are the same for slow and fast computation on buggy seq", {
+  test_seq <- DNAString("GGGGGGGCAGCCGGCTCGTTTCGGAGAGCGGGCCGGGCAAGGGTGAACACACAGCGGGC")
+  
+  pv_fast <- pqsfinder(test_seq, fast = TRUE)
+  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  
+  # this fails because the optimization blocks to find the minimal-length PQS
+  # between PQS with the same score
+  expect_equal_pv_coords(pv_fast, pv_slow)
+})
+
 test_that("sequences pqs parts can be extracted", {
   test_seq <- DNAString("GGGTAGTGGTTTTGGGTTTGGGAAAAAAAAAAAAAAGGGTTTGGAGGAAATTTGGGGAGGGG")
   pv <- pqsfinder(test_seq, strand = "+")
