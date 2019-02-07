@@ -555,9 +555,9 @@ void find_all_runs(
   string::const_iterator s, e, min_e;
   int score, loop_len;
   bool found_any;
-  int next_tetrad_count;
-  int next_defect_count;
-  int max_score;
+  int next_tetrad_count = INT_MAX;
+  int next_defect_count = 0;
+  int max_score = 0;
   
   ++fn_call_count;
 
@@ -703,14 +703,14 @@ storage &select_pqs_storage(
  * @param b Second item
  * @return Is a lower than b?
  */
-bool cmp_res_item_by_start(const results::item_t &a, const results::item_t &b)
+bool compare_result_by_start(const results::item_t &a, const results::item_t &b)
 {
   return a.start < b.start;
 }
 
 
 /**
- * Find PQS that were missed during fast search
+ * Find neighbouring PQS that were missed during fast search
  * 
  * @param subject
  * @param seq_begin Beginning of DNA sequence
@@ -719,9 +719,11 @@ bool cmp_res_item_by_start(const results::item_t &a, const results::item_t &b)
  * @param sc
  * @param opts
  * @param res
+ * @param neighbouring_res
+ * @param pqs_storage
  * @param fn_call_count
  */
-void find_overscored_pqs(
+void find_overscored_neighbouring_pqs(
     SEXP subject,
     const string::const_iterator seq_begin,
     const string::const_iterator seq_end,
@@ -729,32 +731,24 @@ void find_overscored_pqs(
     const scoring &sc,
     const opts_t &opts,
     results &res,
+    results &neighbouring_res,
+    storage &pqs_storage,
     int &fn_call_count
 )
 {
   run_match m[RUN_CNT];
   int pqs_cnt = 0;
-  overlapping_storage ov_storage(seq_begin);
-  revised_non_overlapping_storage nov_storage(seq_begin);
-  storage &pqs_storage = select_pqs_storage(opts.overlapping, ov_storage, nov_storage);
-  
-  // sort results to have them in sequence order
-  sort(res.items.begin(), res.items.end(), cmp_res_item_by_start);
-  
-  // neccessary to have clean results object with zero max_scores vector
-  results overscored_res(seq_end - seq_begin, opts.min_score, seq_begin);
-  
   string::const_iterator left_start, left_end, right_start, right_end, next_pqs_start, prev_pqs_end;
   
   for (size_t i = 0; i < res.items.size(); ++i) {
     
-    left_end = res.items[i].start - 1;
-    right_start = res.items[i].start + res.items[i].len - 1;
+    left_end = res.items[i].start;
+    right_start = res.items[i].start + res.items[i].len;
     
     if (i == 0) {
       left_start = max(left_end - opts.max_len, seq_begin);
     } else {
-      prev_pqs_end = res.items[i-1].start + res.items[i-1].len - 1;
+      prev_pqs_end = res.items[i-1].start + res.items[i-1].len;
       left_start = max(left_end - opts.max_len, prev_pqs_end);
       if (left_start - prev_pqs_end < 50) {
         left_start = left_end; // do not search again
@@ -763,7 +757,7 @@ void find_overscored_pqs(
     if (i == res.items.size() - 1) {
       right_end = min(right_start + opts.max_len, seq_end);
     } else {
-      next_pqs_start = res.items[i+1].start - 1;
+      next_pqs_start = res.items[i+1].start;
       right_end = min(right_start + opts.max_len, next_pqs_start);
       if (next_pqs_start - right_end < opts.max_len) {
         right_end = next_pqs_start; // extend search region
@@ -783,10 +777,10 @@ void find_overscored_pqs(
       find_all_runs(
         subject, 0, left_start, left_end, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
-        pqs_cnt, overscored_res, false, chrono::system_clock::now(),
+        pqs_cnt, neighbouring_res, false, chrono::system_clock::now(),
         INT_MAX, 0, fn_call_count
       );
-      pqs_storage.export_pqs(overscored_res);
+      pqs_storage.export_pqs(neighbouring_res);
     }
     if (right_end - right_start > opts.run_min_len * 4) {
       // search left negative neighbourhood for overshadowed pqs
@@ -794,15 +788,127 @@ void find_overscored_pqs(
       find_all_runs(
         subject, 0, right_start, right_end, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
-        pqs_cnt, overscored_res, false, chrono::system_clock::now(),
+        pqs_cnt, neighbouring_res, false, chrono::system_clock::now(),
         INT_MAX, 0, fn_call_count
       );
-      pqs_storage.export_pqs(overscored_res);
+      pqs_storage.export_pqs(neighbouring_res);
     }
   }
-  // copy results to global results
-  for (size_t i = 0; i < overscored_res.items.size(); ++i) {
-    res.items.push_back(overscored_res.items[i]);
+}
+
+
+/**
+ * Find PQS overlapping from left that were missed during fast search
+ * 
+ * @param subject
+ * @param seq_begin Beginning of DNA sequence
+ * @param seq_end End of DNA sequence
+ * @param run_re_c
+ * @param sc
+ * @param opts
+ * @param res
+ * @param left_res
+ * @param pqs_storage
+ * @param fn_call_count
+ */
+void find_overscored_left_overlapping_pqs(
+    SEXP subject,
+    const string::const_iterator seq_begin,
+    const string::const_iterator seq_end,
+    const boost::regex &run_re_c,
+    const scoring &sc,
+    const opts_t &opts,
+    results &res,
+    results &left_res,
+    storage &pqs_storage,
+    int &fn_call_count
+)
+{
+  run_match m[RUN_CNT];
+  int pqs_cnt = 0;
+  string::const_iterator left_start, left_end, right_start, prev_pqs_end;
+  
+  for (size_t i = 0; i < res.items.size(); ++i) {
+    
+    left_end = res.items[i].start;
+    right_start = res.items[i].start + res.items[i].len;
+    
+    if (i == 0) {
+      left_start = max(left_end - opts.max_len, seq_begin);
+    } else {
+      prev_pqs_end = res.items[i-1].start + res.items[i-1].len;
+      left_start = max(left_end - opts.max_len, prev_pqs_end);
+    }
+    if (opts.verbose) {
+      Rcout << "region " <<
+        left_start - seq_begin + 1 << "-" <<
+          right_start - seq_begin <<  endl;
+    }
+    find_all_runs(
+      subject, 0, left_start, right_start, m, run_re_c, opts, sc, 
+      seq_begin, seq_end - seq_begin, pqs_storage,
+      pqs_cnt, left_res, false, chrono::system_clock::now(),
+      INT_MAX, 0, fn_call_count
+    );
+    pqs_storage.export_pqs(left_res);
+  }
+}
+
+
+/**
+ * Find PQS overlapping from right that were missed during fast search
+ * 
+ * @param subject
+ * @param seq_begin Beginning of DNA sequence
+ * @param seq_end End of DNA sequence
+ * @param run_re_c
+ * @param sc
+ * @param opts
+ * @param res
+ * @param right_res
+ * @param pqs_storage
+ * @param fn_call_count
+ */
+void find_overscored_right_overlapping_pqs(
+    SEXP subject,
+    const string::const_iterator seq_begin,
+    const string::const_iterator seq_end,
+    const boost::regex &run_re_c,
+    const scoring &sc,
+    const opts_t &opts,
+    results &res,
+    results &right_res,
+    storage &pqs_storage,
+    int &fn_call_count
+)
+{
+  run_match m[RUN_CNT];
+  int pqs_cnt = 0;
+  string::const_iterator left_end, right_start, right_end, next_pqs_start;
+  
+  for (size_t i = 0; i < res.items.size(); ++i) {
+    
+    left_end = res.items[i].start;
+    right_start = res.items[i].start + res.items[i].len;
+    
+    if (i == res.items.size() - 1) {
+      right_end = min(right_start + opts.max_len, seq_end);
+    } else {
+      next_pqs_start = res.items[i+1].start;
+      right_end = min(right_start + opts.max_len, next_pqs_start);
+    }
+    if (opts.verbose) {
+      Rcout << "region " <<
+        left_end - seq_begin + 1 << "-" <<
+          right_start - seq_begin <<  endl;
+    }
+    find_all_runs(
+      subject, 0, left_end, right_end, m, run_re_c, opts, sc, 
+      seq_begin, seq_end - seq_begin, pqs_storage,
+      pqs_cnt, right_res, false, chrono::system_clock::now(),
+      INT_MAX, 0, fn_call_count
+    );
+    pqs_storage.export_pqs(right_res);
   }
 }
 
@@ -883,9 +989,52 @@ void find_pqs(
   pqs_storage.export_pqs(res);
   
   if (opts.fast && !res.items.empty()) {
-    find_overscored_pqs(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, res, fn_call_count
+    // find all overscored pqs
+    
+    // sort results to have them in sequence order
+    sort(res.items.begin(), res.items.end(), compare_result_by_start);
+    
+    results left_res(seq_end - seq_begin, opts.min_score, seq_begin);
+    results right_res(seq_end - seq_begin, opts.min_score, seq_begin);
+    
+    find_overscored_left_overlapping_pqs(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, res, left_res, pqs_storage, fn_call_count
     );
+    find_overscored_right_overlapping_pqs(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, res, right_res, pqs_storage, fn_call_count
+    );
+    // sort results to have them in sequence order
+    sort(left_res.items.begin(), left_res.items.end(), compare_result_by_start);
+    sort(right_res.items.begin(), right_res.items.end(), compare_result_by_start);
+    
+    res.items.clear(); // clear results
+    vector<results::item_t>::const_iterator left_it = left_res.items.begin();
+    vector<results::item_t>::const_iterator right_it = right_res.items.begin();
+    
+    while (left_it != left_res.items.end() || right_it != right_res.items.end()) {
+      if ((left_it != left_res.items.end() && right_it == right_res.items.end()) ||
+          (left_it != left_res.items.end() && right_it != right_res.items.end() && left_it->start < right_it->start)) {
+        pqs_storage.insert_pqs_item(*left_it, res);
+        ++left_it;
+      } else {
+        pqs_storage.insert_pqs_item(*right_it, res);
+        ++right_it;
+      }
+    }
+    pqs_storage.export_pqs(res);
+    
+    // sort results to have them in sequence order
+    sort(res.items.begin(), res.items.end(), compare_result_by_start);
+    
+    results neighbouring_res(seq_end - seq_begin, opts.min_score, seq_begin);
+    
+    find_overscored_neighbouring_pqs(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, res, neighbouring_res, pqs_storage, fn_call_count
+    );
+    // copy results to global results
+    for (size_t i = 0; i < neighbouring_res.items.size(); ++i) {
+      res.items.push_back(neighbouring_res.items[i]);
+    }
   }
 }
 
@@ -927,6 +1076,7 @@ void find_pqs_thread(
 
 /**
  * Merge results from different threads
+ * TODO: This is probably wrong, because PQS does not go to storage in sequence order
  * 
  * @param seq_begin
  * @param res_list
@@ -945,7 +1095,7 @@ void merge_results(
   
   for (size_t i = 0; i < res_list.size(); ++i) {
     // sort partial results to have them in sequence order
-    sort(res_list[i].items.begin(), res_list[i].items.end(), cmp_res_item_by_start);
+    sort(res_list[i].items.begin(), res_list[i].items.end(), compare_result_by_start);
     
     size_t offset = res_list[i].ref - seq_begin;
     
@@ -954,22 +1104,7 @@ void merge_results(
       res.density[offset + k] = max(res.density[offset + k], res_list[i].density[k]);
     }
     for (size_t k = 0; k < res_list[i].items.size(); ++k) {
-      features_t f;
-      f.nt = res_list[i].items[k].nt;
-      f.nb = res_list[i].items[k].nb;
-      f.nm = res_list[i].items[k].nm;
-      f.rl1 = res_list[i].items[k].rl1;
-      f.rl2 = res_list[i].items[k].rl2;
-      f.rl3 = res_list[i].items[k].rl3;
-      f.ll1 = res_list[i].items[k].ll1;
-      f.ll2 = res_list[i].items[k].ll2;
-      f.ll3 = res_list[i].items[k].ll3;
-      
-      pqs_storage.insert_pqs(
-        res_list[i].items[k].score,
-        res_list[i].items[k].start,
-        res_list[i].items[k].start + res_list[i].items[k].len,
-        f, res);
+      pqs_storage.insert_pqs_item(res_list[i].items[k], res);
     }
   }
   pqs_storage.export_pqs(res);
@@ -1003,12 +1138,6 @@ void find_pqs_parallel(
     boost::thread *tt;
     
     boost::thread::attributes attrs;
-    //attrs.set_stack_size(1024*1024*100);
-     
-    // for (int i = 0; i < chunk_list.size(); ++i) {
-    //   Rcout << "Chunk " << i << ": " <<
-    //     chunk_list[i].s - seq.begin() + 1 << "-" << chunk_list[i].e - seq.begin() << endl;
-    // }
     
     // initialize result objects
     vector<results> res_list(chunk_list.size());

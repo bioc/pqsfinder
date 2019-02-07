@@ -23,6 +23,24 @@ public:
   virtual void insert_pqs(
       int score, string::const_iterator s, string::const_iterator e, features_t &f,
       results &res) = 0;
+  virtual void insert_pqs_item(const results::item_t &item, results &res) {
+    features_t f;
+    f.nt = item.nt;
+    f.nb = item.nb;
+    f.nm = item.nm;
+    f.rl1 = item.rl1;
+    f.rl2 = item.rl2;
+    f.rl3 = item.rl3;
+    f.ll1 = item.ll1;
+    f.ll2 = item.ll2;
+    f.ll3 = item.ll3;
+    
+    this->insert_pqs(
+      item.score,
+      item.start,
+      item.start + item.len,
+      f, res);
+  }
   virtual void export_pqs(results &res) = 0;
 };
 

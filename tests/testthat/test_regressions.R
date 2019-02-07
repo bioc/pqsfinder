@@ -99,7 +99,7 @@ test_that("density vector is a sum of density on sense and antisense", {
 })
 
 test_that("results are the same for slow and fast computation on random string", {
-  test_seq <- DNAString(stri_rand_shuffle(strrep("ACCGGT", 1000)))
+  test_seq <- DNAString(stri_rand_shuffle(strrep("ACGGGT", 1000)))
   
   system.time(pv_fast <- pqsfinder(test_seq, fast = TRUE))
   system.time(pv_slow <- pqsfinder(test_seq, fast = FALSE))
@@ -107,14 +107,39 @@ test_that("results are the same for slow and fast computation on random string",
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
 
-test_that("results are the same for slow and fast computation on buggy seq", {
+test_that("results are correct on buggy seq1", {
   test_seq <- DNAString("GGGGGGGCAGCCGGCTCGTTTCGGAGAGCGGGCCGGGCAAGGGTGAACACACAGCGGGC")
   
   pv_fast <- pqsfinder(test_seq, fast = TRUE)
   pv_slow <- pqsfinder(test_seq, fast = FALSE)
   
-  # this fails because the optimization blocks to find the minimal-length PQS
-  # between PQS with the same score
+  expect_equal_pv_coords(pv_fast, pv_slow)
+})
+
+test_that("results are correct on buggy seq2", {
+  test_seq <- DNAString("GGGGTGCCCTAGGGGAGGGGGTGGGGAGGGACCGCCGGGCGACGGAGGGGTCGGTGCTTAGGACTGTCGGGGCGAAACGGCAGCGG")
+  
+  pv_fast <- pqsfinder(test_seq, fast = TRUE)
+  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  
+  expect_equal_pv_coords(pv_fast, pv_slow)
+})
+
+test_that("results are correct on buggy seq3", {
+  test_seq <- DNAString("GTACTGGGCCGGGGGCGGGCGGTGGCTGGCTAGCTGGGGGGGGGAGGCGCCGGTCAACGGGGGGCCAAGGAGGAGGG")
+  
+  pv_fast <- pqsfinder(test_seq, fast = TRUE)
+  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  
+  expect_equal_pv_coords(pv_fast, pv_slow)
+})
+
+test_that("results are correct on buggy seq4", {
+  test_seq <- DNAString("GACAAGTGACAGCGTTGGGGGGGGGGGGGACCTGCGATCTAAGGAGCACGTGGGGTGGAAGGTGAATGGGGAGTGTGTGGCCGGATAGCTCGGTCGTCCTCCGAGGCTAGCGGGTGGAGGGCTCGAGATGCGGAGTGTTGGTAGGTGGGAGAGCCTTAGATACGGGTAACGAGGGGTCGCGCGGCAGTGTTGAGACTTGTGGGCAGCGTGGTAGGGGCGCGGGCGAAGGGGGGCTGGGCGGGTGTCGGGGAAGGAGGGGGCGGTCGCTTTGTTGTGAGGTGAAGTGCAAGGACGCAGGGAC")
+  
+  pv_fast <- pqsfinder(test_seq, fast = TRUE)
+  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
 
