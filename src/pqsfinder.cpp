@@ -795,7 +795,34 @@ void find_overscored_neighbouring_pqs(
     }
   }
 }
-
+void find_overscored_pqs(
+    SEXP subject,
+    const string::const_iterator seq_begin,
+    const string::const_iterator seq_end,
+    const boost::regex &run_re_c,
+    const scoring &sc,
+    const opts_t &opts,
+    results &res,
+    results &new_res,
+    storage &pqs_storage,
+    int &fn_call_count
+)
+{
+  run_match m[RUN_CNT];
+  int pqs_cnt = 0;
+  string::const_iterator left_start, left_end, right_start, right_end, next_pqs_start, prev_pqs_end;
+  
+  for (size_t i = 0; i < res.items.size(); ++i) {
+    
+    find_all_runs(
+      subject, 0, res.items[i].start, res.items[i].start + res.items[i].len, m, run_re_c, opts, sc, 
+      seq_begin, seq_end - seq_begin, pqs_storage,
+      pqs_cnt, new_res, false, chrono::system_clock::now(),
+      INT_MAX, 0, fn_call_count
+    );
+    pqs_storage.export_pqs(new_res);
+  }
+}
 
 /**
  * Find PQS overlapping from left that were missed during fast search
@@ -991,11 +1018,86 @@ void find_pqs(
   if (opts.fast && !res.items.empty()) {
     // find all overscored pqs
     
+    
+    // sort results to have them in sequence order
+    sort(res.items.begin(), res.items.end(), compare_result_by_start);
+    
+    results new_res(seq_end - seq_begin, opts.min_score, seq_begin);
+    find_overscored_pqs(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, res, new_res, pqs_storage, fn_call_count
+    );
+    res.items.clear();
+    // copy results to global results
+    for (size_t i = 0; i < new_res.items.size(); ++i) {
+      res.items.push_back(new_res.items[i]);
+    }
+    
+    
     // sort results to have them in sequence order
     sort(res.items.begin(), res.items.end(), compare_result_by_start);
     
     results left_res(seq_end - seq_begin, opts.min_score, seq_begin);
     results right_res(seq_end - seq_begin, opts.min_score, seq_begin);
+
+    find_overscored_left_overlapping_pqs(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, res, left_res, pqs_storage, fn_call_count
+    );
+    find_overscored_right_overlapping_pqs(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, res, right_res, pqs_storage, fn_call_count
+    );
+    // sort results to have them in sequence order
+    sort(left_res.items.begin(), left_res.items.end(), compare_result_by_start);
+    sort(right_res.items.begin(), right_res.items.end(), compare_result_by_start);
+
+    res.items.clear(); // clear results
+    vector<results::item_t>::const_iterator left_it = left_res.items.begin();
+    vector<results::item_t>::const_iterator right_it = right_res.items.begin();
+
+    while (left_it != left_res.items.end() || right_it != right_res.items.end()) {
+      if ((left_it != left_res.items.end() && right_it == right_res.items.end()) ||
+          (left_it != left_res.items.end() && right_it != right_res.items.end() && left_it->start < right_it->start)) {
+        pqs_storage.insert_pqs_item(*left_it, res);
+        ++left_it;
+      } else {
+        pqs_storage.insert_pqs_item(*right_it, res);
+        ++right_it;
+      }
+    }
+    pqs_storage.export_pqs(res);
+
+    // sort results to have them in sequence order
+    sort(res.items.begin(), res.items.end(), compare_result_by_start);
+
+    results neighbouring_res(seq_end - seq_begin, opts.min_score, seq_begin);
+
+    find_overscored_neighbouring_pqs(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, res, neighbouring_res, pqs_storage, fn_call_count
+    );
+    // copy results to global results
+    for (size_t i = 0; i < neighbouring_res.items.size(); ++i) {
+      res.items.push_back(neighbouring_res.items[i]);
+    }
+    
+    
+    // sort results to have them in sequence order
+    sort(res.items.begin(), res.items.end(), compare_result_by_start);
+    
+    new_res.items.clear();
+    find_overscored_pqs(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, res, new_res, pqs_storage, fn_call_count
+    );
+    res.items.clear();
+    // copy results to global results
+    for (size_t i = 0; i < new_res.items.size(); ++i) {
+      res.items.push_back(new_res.items[i]);
+    }
+    
+    
+    // sort results to have them in sequence order
+    sort(res.items.begin(), res.items.end(), compare_result_by_start);
+    
+    left_res.items.clear();
+    left_res.items.clear();
     
     find_overscored_left_overlapping_pqs(
       subject, seq_begin, seq_end, run_re_c, sc, opts, res, left_res, pqs_storage, fn_call_count
@@ -1008,8 +1110,8 @@ void find_pqs(
     sort(right_res.items.begin(), right_res.items.end(), compare_result_by_start);
     
     res.items.clear(); // clear results
-    vector<results::item_t>::const_iterator left_it = left_res.items.begin();
-    vector<results::item_t>::const_iterator right_it = right_res.items.begin();
+    left_it = left_res.items.begin();
+    right_it = right_res.items.begin();
     
     while (left_it != left_res.items.end() || right_it != right_res.items.end()) {
       if ((left_it != left_res.items.end() && right_it == right_res.items.end()) ||
@@ -1026,7 +1128,7 @@ void find_pqs(
     // sort results to have them in sequence order
     sort(res.items.begin(), res.items.end(), compare_result_by_start);
     
-    results neighbouring_res(seq_end - seq_begin, opts.min_score, seq_begin);
+    neighbouring_res.items.clear();
     
     find_overscored_neighbouring_pqs(
       subject, seq_begin, seq_end, run_re_c, sc, opts, res, neighbouring_res, pqs_storage, fn_call_count
@@ -1034,6 +1136,19 @@ void find_pqs(
     // copy results to global results
     for (size_t i = 0; i < neighbouring_res.items.size(); ++i) {
       res.items.push_back(neighbouring_res.items[i]);
+    }
+    
+    // sort results to have them in sequence order
+    sort(res.items.begin(), res.items.end(), compare_result_by_start);
+    
+    new_res.items.clear();
+    find_overscored_pqs(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, res, new_res, pqs_storage, fn_call_count
+    );
+    res.items.clear();
+    // copy results to global results
+    for (size_t i = 0; i < new_res.items.size(); ++i) {
+      res.items.push_back(new_res.items[i]);
     }
   }
 }
