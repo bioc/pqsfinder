@@ -143,6 +143,15 @@ test_that("results are correct on buggy seq4", {
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
 
+test_that("results are correct on buggy seq5", {
+  test_seq <- DNAString("ATGAGTGGGGCGTTTGCGGGTGCGGGAAGATGGGAGGCGCATTCGGGACAGGAGGGGGACATTTCGGAACGTGAGGGCCGGGGGTGTAAGGGGACAGGGGGTGAGGGCGGGGAGGGGCTTGGTTCGAGTATCGTTGGGGGGTCGGCTGGGGCAGGAGCGATGGGGCGAACTCGTGGGCGGGCTTAGGTGCGAGGTGGATACGTCGAAGCTAGACGTAGGGGGACAGCGCGGGGGGGAGCGATAATGTTCTG")
+  
+  pv_fast <- pqsfinder(test_seq, fast = TRUE)
+  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  
+  expect_equal_pv_coords(pv_fast, pv_slow)
+})
+
 test_that("sequences pqs parts can be extracted", {
   test_seq <- DNAString("GGGTAGTGGTTTTGGGTTTGGGAAAAAAAAAAAAAAGGGTTTGGAGGAAATTTGGGGAGGGG")
   pv <- pqsfinder(test_seq, strand = "+")

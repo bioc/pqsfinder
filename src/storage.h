@@ -10,8 +10,8 @@
 #define STORAGE_HEADER
 
 #include <Rcpp.h>
-#include "results.h"
 #include "features.h"
+#include "results.h"
 
 using namespace Rcpp;
 using namespace std;
@@ -216,4 +216,4 @@ public:
   }
 };
 
-#endif // PQS_STORAGE_HEADER
+#endif // STORAGE_HEADER

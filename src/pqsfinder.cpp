@@ -24,9 +24,8 @@
 #ifdef GPERF_ENABLED
 #include <gperftools/profiler.h>
 #endif
-#include "results.h"
-#include "storage.h"
-#include "features.h"
+#include "overscored.h"
+#include "pqsfinder.h"
 
 using namespace Rcpp;
 using namespace std;
@@ -48,55 +47,6 @@ using namespace std;
  */
 
 
-static const int RUN_CNT = 4;
-
-
-class scoring {
-public:
-  int tetrad_bonus;
-  int bulge_penalty;
-  double bulge_len_factor;
-  double bulge_len_exponent;
-  int mismatch_penalty;
-  double loop_mean_factor;
-  double loop_mean_exponent;
-  int max_bulges;
-  int max_mimatches;
-  int max_defects;
-  Function *custom_scoring_fn;
-
-  scoring() {
-    custom_scoring_fn = NULL;
-  }
-  ~scoring() {
-    if (custom_scoring_fn != NULL)
-      delete custom_scoring_fn;
-  }
-  void set_custom_scoring_fn(SEXP custom_scoring_fn) {
-    this->custom_scoring_fn = new Function(custom_scoring_fn);
-  }
-};
-
-
-// algorithm options
-struct opts_t {
-  int max_len;
-  int min_score;
-  int run_min_len;
-  int run_max_len;
-  int loop_min_len;
-  int loop_max_len;
-  int check_int_period;
-  size_t threads;
-  size_t chunk_size;
-  bool verbose;
-  bool overlapping;
-  bool use_re;
-  bool debug;
-  bool use_default_scoring;
-  bool fast;
-};
-
 
 // search progress description
 struct search_progress_t {
@@ -113,17 +63,6 @@ struct seq_chunk_t {
   string::const_iterator e;
 };
 
-
-// class representing one run from quadruplex
-class run_match {
-public:
-  string::const_iterator first;
-  string::const_iterator second;
-  int g_count;
-  int length() const {
-    return second - first;
-  };
-};
 
 
 /**
@@ -697,19 +636,6 @@ storage &select_pqs_storage(
 
 
 /**
- * Compare results item by start coordinates
- * 
- * @param a First item
- * @param b Second item
- * @return Is a lower than b?
- */
-bool compare_result_by_start(const results::item_t &a, const results::item_t &b)
-{
-  return a.start < b.start;
-}
-
-
-/**
  * Find neighbouring PQS that were missed during fast search
  * 
  * @param subject
@@ -750,7 +676,7 @@ void find_overscored_neighbouring_pqs(
     } else {
       prev_pqs_end = res.items[i-1].start + res.items[i-1].len;
       left_start = max(left_end - opts.max_len, prev_pqs_end);
-      if (left_start - prev_pqs_end < 50) {
+      if (left_start - prev_pqs_end < opts.max_len) {
         left_start = left_end; // do not search again
       }
     }
@@ -795,7 +721,7 @@ void find_overscored_neighbouring_pqs(
     }
   }
 }
-void find_overscored_pqs(
+void find_overscored_self_pqs(
     SEXP subject,
     const string::const_iterator seq_begin,
     const string::const_iterator seq_end,
@@ -860,12 +786,12 @@ void find_overscored_left_overlapping_pqs(
     left_end = res.items[i].start;
     right_start = res.items[i].start + res.items[i].len;
     
-    if (i == 0) {
+    // if (i == 0) {
       left_start = max(left_end - opts.max_len, seq_begin);
-    } else {
-      prev_pqs_end = res.items[i-1].start + res.items[i-1].len;
-      left_start = max(left_end - opts.max_len, prev_pqs_end);
-    }
+    // } else {
+    //   prev_pqs_end = res.items[i-1].start + res.items[i-1].len;
+    //   left_start = max(left_end - opts.max_len, prev_pqs_end);
+    // }
     if (opts.verbose) {
       Rcout << "region " <<
         left_start - seq_begin + 1 << "-" <<
@@ -918,16 +844,16 @@ void find_overscored_right_overlapping_pqs(
     left_end = res.items[i].start;
     right_start = res.items[i].start + res.items[i].len;
     
-    if (i == res.items.size() - 1) {
+    // if (i == res.items.size() - 1) {
       right_end = min(right_start + opts.max_len, seq_end);
-    } else {
-      next_pqs_start = res.items[i+1].start;
-      right_end = min(right_start + opts.max_len, next_pqs_start);
-    }
+    // } else {
+    //   next_pqs_start = res.items[i+1].start;
+    //   right_end = min(right_start + opts.max_len, next_pqs_start);
+    // }
     if (opts.verbose) {
       Rcout << "region " <<
         left_end - seq_begin + 1 << "-" <<
-          right_start - seq_begin <<  endl;
+          right_end - seq_begin <<  endl;
     }
     find_all_runs(
       subject, 0, left_end, right_end, m, run_re_c, opts, sc, 
@@ -979,6 +905,31 @@ vector<seq_chunk_t> split_seq_to_chunks(
 }
 
 
+void merge_res_items(results &a, results &b, results &merged) {
+  revised_non_overlapping_storage pqs_storage(merged.ref);
+  
+  // sort results to have them in sequence order
+  a.sort_items();
+  b.sort_items();
+  
+  merged.items.clear(); // clear results
+  vector<results::item_t>::const_iterator left_it = a.items.begin();
+  vector<results::item_t>::const_iterator right_it = b.items.begin();
+  
+  while (left_it != a.items.end() || right_it != b.items.end()) {
+    if ((left_it != a.items.end() && right_it == b.items.end()) ||
+        (left_it != a.items.end() && right_it != b.items.end() && left_it->start < right_it->start)) {
+      pqs_storage.insert_pqs_item(*left_it, merged);
+      ++left_it;
+    } else {
+      pqs_storage.insert_pqs_item(*right_it, merged);
+      ++right_it;
+    }
+  }
+  pqs_storage.export_pqs(merged);
+}
+
+
 /**
  * Perform quadruplex search on given DNA sequence.
  *
@@ -1018,138 +969,43 @@ void find_pqs(
   if (opts.fast && !res.items.empty()) {
     // find all overscored pqs
     
+    results a_res(seq_end - seq_begin, opts.min_score, seq_begin);
+    results b_res(seq_end - seq_begin, opts.min_score, seq_begin);
+    results c_res(seq_end - seq_begin, opts.min_score, seq_begin);
     
-    // sort results to have them in sequence order
-    sort(res.items.begin(), res.items.end(), compare_result_by_start);
-    
-    results new_res(seq_end - seq_begin, opts.min_score, seq_begin);
-    find_overscored_pqs(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, res, new_res, pqs_storage, fn_call_count
+    find_overscored_pqs<Overscored::SELF>(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, res, a_res, pqs_storage, fn_call_count
     );
-    res.items.clear();
-    // copy results to global results
-    for (size_t i = 0; i < new_res.items.size(); ++i) {
-      res.items.push_back(new_res.items[i]);
-    }
+    // a_res = self overscored
     
+    find_overscored_pqs<Overscored::LEFT_BOUND>(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, pqs_storage, fn_call_count
+    );
+    find_overscored_pqs<Overscored::LEFT_UNBOUND>(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, c_res, pqs_storage, fn_call_count
+    );
+    // b_res = left bound
+    // c_res = left unbound
+    merge_res_items(b_res, c_res, a_res);
+    // a_res = left (un)bound
     
-    // sort results to have them in sequence order
-    sort(res.items.begin(), res.items.end(), compare_result_by_start);
+    find_overscored_pqs<Overscored::RIGHT_BOUND>(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, pqs_storage, fn_call_count
+    );
+    merge_res_items(a_res, b_res, c_res);
+    // c_res = left (un)bound + right bound
     
-    results left_res(seq_end - seq_begin, opts.min_score, seq_begin);
-    results right_res(seq_end - seq_begin, opts.min_score, seq_begin);
+    find_overscored_pqs<Overscored::RIGHT_UNBOUND>(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, pqs_storage, fn_call_count
+    );
+    merge_res_items(c_res, b_res, a_res);
+    // c_res = left (un)bound + right (un)bound
 
-    find_overscored_left_overlapping_pqs(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, res, left_res, pqs_storage, fn_call_count
+    find_overscored_pqs<Overscored::NEIGHBOURING>(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, pqs_storage, fn_call_count
     );
-    find_overscored_right_overlapping_pqs(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, res, right_res, pqs_storage, fn_call_count
-    );
-    // sort results to have them in sequence order
-    sort(left_res.items.begin(), left_res.items.end(), compare_result_by_start);
-    sort(right_res.items.begin(), right_res.items.end(), compare_result_by_start);
-
-    res.items.clear(); // clear results
-    vector<results::item_t>::const_iterator left_it = left_res.items.begin();
-    vector<results::item_t>::const_iterator right_it = right_res.items.begin();
-
-    while (left_it != left_res.items.end() || right_it != right_res.items.end()) {
-      if ((left_it != left_res.items.end() && right_it == right_res.items.end()) ||
-          (left_it != left_res.items.end() && right_it != right_res.items.end() && left_it->start < right_it->start)) {
-        pqs_storage.insert_pqs_item(*left_it, res);
-        ++left_it;
-      } else {
-        pqs_storage.insert_pqs_item(*right_it, res);
-        ++right_it;
-      }
-    }
-    pqs_storage.export_pqs(res);
-
-    // sort results to have them in sequence order
-    sort(res.items.begin(), res.items.end(), compare_result_by_start);
-
-    results neighbouring_res(seq_end - seq_begin, opts.min_score, seq_begin);
-
-    find_overscored_neighbouring_pqs(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, res, neighbouring_res, pqs_storage, fn_call_count
-    );
-    // copy results to global results
-    for (size_t i = 0; i < neighbouring_res.items.size(); ++i) {
-      res.items.push_back(neighbouring_res.items[i]);
-    }
-    
-    
-    // sort results to have them in sequence order
-    sort(res.items.begin(), res.items.end(), compare_result_by_start);
-    
-    new_res.items.clear();
-    find_overscored_pqs(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, res, new_res, pqs_storage, fn_call_count
-    );
-    res.items.clear();
-    // copy results to global results
-    for (size_t i = 0; i < new_res.items.size(); ++i) {
-      res.items.push_back(new_res.items[i]);
-    }
-    
-    
-    // sort results to have them in sequence order
-    sort(res.items.begin(), res.items.end(), compare_result_by_start);
-    
-    left_res.items.clear();
-    left_res.items.clear();
-    
-    find_overscored_left_overlapping_pqs(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, res, left_res, pqs_storage, fn_call_count
-    );
-    find_overscored_right_overlapping_pqs(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, res, right_res, pqs_storage, fn_call_count
-    );
-    // sort results to have them in sequence order
-    sort(left_res.items.begin(), left_res.items.end(), compare_result_by_start);
-    sort(right_res.items.begin(), right_res.items.end(), compare_result_by_start);
-    
-    res.items.clear(); // clear results
-    left_it = left_res.items.begin();
-    right_it = right_res.items.begin();
-    
-    while (left_it != left_res.items.end() || right_it != right_res.items.end()) {
-      if ((left_it != left_res.items.end() && right_it == right_res.items.end()) ||
-          (left_it != left_res.items.end() && right_it != right_res.items.end() && left_it->start < right_it->start)) {
-        pqs_storage.insert_pqs_item(*left_it, res);
-        ++left_it;
-      } else {
-        pqs_storage.insert_pqs_item(*right_it, res);
-        ++right_it;
-      }
-    }
-    pqs_storage.export_pqs(res);
-    
-    // sort results to have them in sequence order
-    sort(res.items.begin(), res.items.end(), compare_result_by_start);
-    
-    neighbouring_res.items.clear();
-    
-    find_overscored_neighbouring_pqs(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, res, neighbouring_res, pqs_storage, fn_call_count
-    );
-    // copy results to global results
-    for (size_t i = 0; i < neighbouring_res.items.size(); ++i) {
-      res.items.push_back(neighbouring_res.items[i]);
-    }
-    
-    // sort results to have them in sequence order
-    sort(res.items.begin(), res.items.end(), compare_result_by_start);
-    
-    new_res.items.clear();
-    find_overscored_pqs(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, res, new_res, pqs_storage, fn_call_count
-    );
-    res.items.clear();
-    // copy results to global results
-    for (size_t i = 0; i < new_res.items.size(); ++i) {
-      res.items.push_back(new_res.items[i]);
-    }
+    merge_res_items(a_res, b_res, res);
+    // res = left (un)bound + right (un)bound + neighbouring
   }
 }
 
@@ -1210,7 +1066,7 @@ void merge_results(
   
   for (size_t i = 0; i < res_list.size(); ++i) {
     // sort partial results to have them in sequence order
-    sort(res_list[i].items.begin(), res_list[i].items.end(), compare_result_by_start);
+    res_list[i].sort_items();
     
     size_t offset = res_list[i].ref - seq_begin;
     
