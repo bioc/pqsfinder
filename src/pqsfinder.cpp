@@ -546,9 +546,6 @@ void find_all_runs(
         }
         if ((max_score < res.max_scores[m[0].first - ref] || max_score < opts.min_score)) {
           // comparison to min_score helps also quite a lot (2-3x speedup for default min_score)
-          if (opts.verbose) {
-            Rcout << "Skip search branch..." << endl;
-          }
           continue;
         }
       }
@@ -662,7 +659,7 @@ void merge_res_items(results &a, results &b, results &merged) {
   a.sort_items();
   b.sort_items();
   
-  merged.items.clear(); // clear results
+  merged.items.clear(); // clear only result items (not vectors)
   vector<results::item_t>::const_iterator left_it = a.items.begin();
   vector<results::item_t>::const_iterator right_it = b.items.begin();
   
@@ -677,6 +674,63 @@ void merge_res_items(results &a, results &b, results &merged) {
     }
   }
   pqs_storage.export_pqs(merged);
+}
+
+
+void find_all_overscored_pqs(
+    SEXP subject,
+    const string::const_iterator seq_begin,
+    const string::const_iterator seq_end,
+    const boost::regex &run_re_c,
+    const scoring &sc,
+    const opts_t &opts,
+    results &res,
+    int &fn_call_count)
+{
+  results self_res(seq_end - seq_begin, opts.min_score, seq_begin);
+  results a_res(seq_end - seq_begin, opts.min_score, seq_begin);
+  results b_res(seq_end - seq_begin, opts.min_score, seq_begin);
+  results c_res(seq_end - seq_begin, opts.min_score, seq_begin);
+  
+  find_overscored_pqs<Overscored::SELF>(
+    subject, seq_begin, seq_end, run_re_c, sc, opts, res, self_res, fn_call_count
+  );
+  // self_res = self overscored
+  
+  find_overscored_pqs<Overscored::LEFT_BOUND>(
+    subject, seq_begin, seq_end, run_re_c, sc, opts, self_res, a_res, fn_call_count
+  );
+  find_overscored_pqs<Overscored::LEFT_UNBOUND>(
+    subject, seq_begin, seq_end, run_re_c, sc, opts, self_res, b_res, fn_call_count
+  );
+  // a_res = left bound
+  // b_res = left unbound
+  merge_res_items(a_res, b_res, c_res);
+  // c_res = left (un)bound
+  
+  find_overscored_pqs<Overscored::RIGHT_BOUND>(
+    subject, seq_begin, seq_end, run_re_c, sc, opts, self_res, a_res, fn_call_count
+  );
+  merge_res_items(c_res, a_res, b_res);
+  // b_res = left (un)bound + right bound
+  
+  find_overscored_pqs<Overscored::RIGHT_UNBOUND>(
+    subject, seq_begin, seq_end, run_re_c, sc, opts, self_res, a_res, fn_call_count
+  );
+  merge_res_items(b_res, a_res, c_res);
+  // c_res = left (un)bound + right (un)bound
+  
+  find_overscored_pqs<Overscored::NEIGHBOURING>(
+    subject, seq_begin, seq_end, run_re_c, sc, opts, c_res, a_res, fn_call_count
+  );
+  merge_res_items(c_res, a_res, b_res);
+  // b_res = left (un)bound + right (un)bound + neighbouring
+  
+  find_overscored_pqs<Overscored::NEIGHBOURING_SELF>(
+    subject, seq_begin, seq_end, run_re_c, sc, opts, b_res, a_res, fn_call_count
+  );
+  merge_res_items(b_res, a_res, res);
+  // res = left (un)bound + right (un)bound + neighbouring + neighbouring self
 }
 
 
@@ -717,80 +771,15 @@ void find_pqs(
   pqs_storage.export_pqs(res);
   
   if (opts.fast && !res.items.empty()) {
-    // find all overscored pqs
+    size_t prev_count = 0;
+    size_t iter_count = 0;
     
-    results a_res(seq_end - seq_begin, opts.min_score, seq_begin);
-    results b_res(seq_end - seq_begin, opts.min_score, seq_begin);
-    results c_res(seq_end - seq_begin, opts.min_score, seq_begin);
-    
-    find_overscored_pqs<Overscored::SELF>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, res, a_res, fn_call_count
-    );
-    // a_res = self overscored
-    
-    find_overscored_pqs<Overscored::LEFT_BOUND>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, fn_call_count
-    );
-    find_overscored_pqs<Overscored::LEFT_UNBOUND>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, c_res, fn_call_count
-    );
-    // b_res = left bound
-    // c_res = left unbound
-    merge_res_items(b_res, c_res, a_res);
-    // a_res = left (un)bound
-    
-    find_overscored_pqs<Overscored::RIGHT_BOUND>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, fn_call_count
-    );
-    merge_res_items(a_res, b_res, c_res);
-    // c_res = left (un)bound + right bound
-    
-    find_overscored_pqs<Overscored::RIGHT_UNBOUND>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, fn_call_count
-    );
-    merge_res_items(c_res, b_res, a_res);
-    // c_res = left (un)bound + right (un)bound
-
-    find_overscored_pqs<Overscored::NEIGHBOURING>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, fn_call_count
-    );
-    merge_res_items(a_res, b_res, res);
-    // res = left (un)bound + right (un)bound + neighbouring
-    
-    
-    find_overscored_pqs<Overscored::SELF>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, res, a_res, fn_call_count
-    );
-    // a_res = self overscored
-    
-    find_overscored_pqs<Overscored::LEFT_BOUND>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, fn_call_count
-    );
-    find_overscored_pqs<Overscored::LEFT_UNBOUND>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, c_res, fn_call_count
-    );
-    // b_res = left bound
-    // c_res = left unbound
-    merge_res_items(b_res, c_res, a_res);
-    // a_res = left (un)bound
-    
-    find_overscored_pqs<Overscored::RIGHT_BOUND>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, fn_call_count
-    );
-    merge_res_items(a_res, b_res, c_res);
-    // c_res = left (un)bound + right bound
-    
-    find_overscored_pqs<Overscored::RIGHT_UNBOUND>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, fn_call_count
-    );
-    merge_res_items(c_res, b_res, a_res);
-    // c_res = left (un)bound + right (un)bound
-    
-    find_overscored_pqs<Overscored::NEIGHBOURING>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, fn_call_count
-    );
-    merge_res_items(a_res, b_res, res);
-    // res = left (un)bound + right (un)bound + neighbouring
+    while (prev_count != res.items.size()) {
+      ++iter_count;
+      prev_count = res.items.size();
+      find_all_overscored_pqs(subject, seq_begin, seq_end, run_re_c, sc, opts, res, fn_call_count);
+    }
+    Rcout << "find_all_overscored_pqs iteration: " << iter_count << endl;
   }
 }
 

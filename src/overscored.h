@@ -26,6 +26,7 @@ enum type_t {
   RIGHT_BOUND,
   RIGHT_UNBOUND,
   NEIGHBOURING,
+  NEIGHBOURING_SELF,
 };
 }
 
@@ -64,6 +65,8 @@ void find_overscored_pqs(
   new_res.items.clear();
   
   for (size_t i = 0; i < res.items.size(); ++i) {
+    
+    new_res.clear_max_scores();
     
     revised_non_overlapping_storage pqs_storage(seq_begin);
     
@@ -113,7 +116,7 @@ void find_overscored_pqs(
         );
       }
     } else if (type == Overscored::LEFT_BOUND) {
-      Rcout << "region " << left_start - seq_begin + 1 << "-" << right_start - seq_begin << endl;
+      // Rcout << "region " << left_start - seq_begin + 1 << "-" << right_start - seq_begin << endl;
       find_all_runs(
         subject, 0, left_start, right_start, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
@@ -135,8 +138,16 @@ void find_overscored_pqs(
         INT_MAX, 0, fn_call_count
       );
     } else if (type == Overscored::RIGHT_UNBOUND) {
+      // Rcout << "region " << left_end - seq_begin + 1 << "-" <<  min(right_start + opts.max_len, seq_end) - seq_begin << endl;
       find_all_runs(
         subject, 0, left_end, min(right_start + opts.max_len, seq_end), m, run_re_c, opts, sc, 
+        seq_begin, seq_end - seq_begin, pqs_storage,
+        pqs_cnt, new_res, false, chrono::system_clock::now(),
+        INT_MAX, 0, fn_call_count
+      );
+    } else if (type == Overscored::NEIGHBOURING_SELF) {
+      find_all_runs(
+        subject, 0, left_start, right_end, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
         pqs_cnt, new_res, false, chrono::system_clock::now(),
         INT_MAX, 0, fn_call_count
@@ -144,14 +155,14 @@ void find_overscored_pqs(
     }
     pqs_storage.export_pqs(new_res);
     
-    if (type == Overscored::LEFT_BOUND) {
-      new_res.print();
-    }
+    // if (type == Overscored::RIGHT_UNBOUND) {
+      // new_res.sort_items();
+      // new_res.print();
+    // }
   }
-  
-  Rcout << "After solve overscored " << type << endl;
-  new_res.sort_items();
-  new_res.print();
+  // Rcout << "After solve overscored " << type << endl;
+  // new_res.sort_items();
+  // new_res.print();
 }
 
 #endif // OVERSCORED_HEADER
