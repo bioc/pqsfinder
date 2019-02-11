@@ -8,7 +8,7 @@
  * Package: pqsfinder
  */
 
-// #define GPERF_ENABLED
+#define GPERF_ENABLED
 
 #include <Rcpp.h>
 #include <string>
@@ -193,7 +193,7 @@ inline int score_pqs(
 {
   int w[RUN_CNT], g[RUN_CNT], l[RUN_CNT - 1];
   int min_pw, pi, score;
-  double mean;
+  // double mean;
   
   l[0] = m[1].first - m[0].second;
   l[1] = m[2].first - m[1].second;
@@ -243,9 +243,10 @@ inline int score_pqs(
   f.ll2 = l[1];
   f.ll3 = l[2];
   
-  mean = (double) (l[0] + l[1] + l[2]) / 3.0;
+  // mean = (double) (l[0] + l[1] + l[2]) / 3.0;
   
-  return max(score - (int) round(sc.loop_mean_factor * pow(mean, sc.loop_mean_exponent)), 0);
+  // return max(score - (int) round(sc.loop_mean_factor * pow(mean, sc.loop_mean_exponent)), 0);
+  return max(score - sc.loop_penalties[l[0] + l[1] + l[2]], 0);
 }
 
 
@@ -1093,6 +1094,7 @@ SEXP pqsfinder(
   sc.max_bulges = max_bulges;
   sc.max_mimatches = max_mismatches;
   sc.max_defects = max_defects;
+  sc.init_loop_penalties(opts.loop_max_len);
 
   string seq = as<string>(as_character(subject));
   Function reverseComplement("reverseComplement");
