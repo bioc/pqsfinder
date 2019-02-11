@@ -615,256 +615,6 @@ void find_all_runs(
   }
 }
 
-/**
- * Select between overlapping and non-overlapping storage.
- * 
- * @param overlapping If report overlapping PQS.
- * @param ov Overlapping storage.
- * @param nov Non-overlapping storage.
- * @return Reference to storage interface.
- */
-storage &select_pqs_storage(
-    bool overlapping,
-    overlapping_storage &ov,
-    revised_non_overlapping_storage &nov)
-{
-  if (overlapping)
-    return ov;
-  else
-    return nov;
-}
-
-
-/**
- * Find neighbouring PQS that were missed during fast search
- * 
- * @param subject
- * @param seq_begin Beginning of DNA sequence
- * @param seq_end End of DNA sequence
- * @param run_re_c
- * @param sc
- * @param opts
- * @param res
- * @param neighbouring_res
- * @param pqs_storage
- * @param fn_call_count
- */
-void find_overscored_neighbouring_pqs(
-    SEXP subject,
-    const string::const_iterator seq_begin,
-    const string::const_iterator seq_end,
-    const boost::regex &run_re_c,
-    const scoring &sc,
-    const opts_t &opts,
-    results &res,
-    results &neighbouring_res,
-    storage &pqs_storage,
-    int &fn_call_count
-)
-{
-  run_match m[RUN_CNT];
-  int pqs_cnt = 0;
-  string::const_iterator left_start, left_end, right_start, right_end, next_pqs_start, prev_pqs_end;
-  
-  for (size_t i = 0; i < res.items.size(); ++i) {
-    
-    left_end = res.items[i].start;
-    right_start = res.items[i].start + res.items[i].len;
-    
-    if (i == 0) {
-      left_start = max(left_end - opts.max_len, seq_begin);
-    } else {
-      prev_pqs_end = res.items[i-1].start + res.items[i-1].len;
-      left_start = max(left_end - opts.max_len, prev_pqs_end);
-      if (left_start - prev_pqs_end < opts.max_len) {
-        left_start = left_end; // do not search again
-      }
-    }
-    if (i == res.items.size() - 1) {
-      right_end = min(right_start + opts.max_len, seq_end);
-    } else {
-      next_pqs_start = res.items[i+1].start;
-      right_end = min(right_start + opts.max_len, next_pqs_start);
-      if (next_pqs_start - right_end < opts.max_len) {
-        right_end = next_pqs_start; // extend search region
-      }
-    }
-    if (opts.verbose) {
-      Rcout << "negative regions " <<
-        left_start - seq_begin + 1 << "-" <<
-          left_end - seq_begin << " " << 
-            right_start - seq_begin + 1 << "-" <<
-              right_end - seq_begin <<  endl;
-    }
-    
-    if (left_end - left_start > opts.run_min_len * 4) {
-      // search left negative neighbourhood for overshadowed pqs
-      
-      find_all_runs(
-        subject, 0, left_start, left_end, m, run_re_c, opts, sc, 
-        seq_begin, seq_end - seq_begin, pqs_storage,
-        pqs_cnt, neighbouring_res, false, chrono::system_clock::now(),
-        INT_MAX, 0, fn_call_count
-      );
-      pqs_storage.export_pqs(neighbouring_res);
-    }
-    if (right_end - right_start > opts.run_min_len * 4) {
-      // search left negative neighbourhood for overshadowed pqs
-      
-      find_all_runs(
-        subject, 0, right_start, right_end, m, run_re_c, opts, sc, 
-        seq_begin, seq_end - seq_begin, pqs_storage,
-        pqs_cnt, neighbouring_res, false, chrono::system_clock::now(),
-        INT_MAX, 0, fn_call_count
-      );
-      pqs_storage.export_pqs(neighbouring_res);
-    }
-  }
-}
-void find_overscored_self_pqs(
-    SEXP subject,
-    const string::const_iterator seq_begin,
-    const string::const_iterator seq_end,
-    const boost::regex &run_re_c,
-    const scoring &sc,
-    const opts_t &opts,
-    results &res,
-    results &new_res,
-    storage &pqs_storage,
-    int &fn_call_count
-)
-{
-  run_match m[RUN_CNT];
-  int pqs_cnt = 0;
-  string::const_iterator left_start, left_end, right_start, right_end, next_pqs_start, prev_pqs_end;
-  
-  for (size_t i = 0; i < res.items.size(); ++i) {
-    
-    find_all_runs(
-      subject, 0, res.items[i].start, res.items[i].start + res.items[i].len, m, run_re_c, opts, sc, 
-      seq_begin, seq_end - seq_begin, pqs_storage,
-      pqs_cnt, new_res, false, chrono::system_clock::now(),
-      INT_MAX, 0, fn_call_count
-    );
-    pqs_storage.export_pqs(new_res);
-  }
-}
-
-/**
- * Find PQS overlapping from left that were missed during fast search
- * 
- * @param subject
- * @param seq_begin Beginning of DNA sequence
- * @param seq_end End of DNA sequence
- * @param run_re_c
- * @param sc
- * @param opts
- * @param res
- * @param left_res
- * @param pqs_storage
- * @param fn_call_count
- */
-void find_overscored_left_overlapping_pqs(
-    SEXP subject,
-    const string::const_iterator seq_begin,
-    const string::const_iterator seq_end,
-    const boost::regex &run_re_c,
-    const scoring &sc,
-    const opts_t &opts,
-    results &res,
-    results &left_res,
-    storage &pqs_storage,
-    int &fn_call_count
-)
-{
-  run_match m[RUN_CNT];
-  int pqs_cnt = 0;
-  string::const_iterator left_start, left_end, right_start, prev_pqs_end;
-  
-  for (size_t i = 0; i < res.items.size(); ++i) {
-    
-    left_end = res.items[i].start;
-    right_start = res.items[i].start + res.items[i].len;
-    
-    // if (i == 0) {
-      left_start = max(left_end - opts.max_len, seq_begin);
-    // } else {
-    //   prev_pqs_end = res.items[i-1].start + res.items[i-1].len;
-    //   left_start = max(left_end - opts.max_len, prev_pqs_end);
-    // }
-    if (opts.verbose) {
-      Rcout << "region " <<
-        left_start - seq_begin + 1 << "-" <<
-          right_start - seq_begin <<  endl;
-    }
-    find_all_runs(
-      subject, 0, left_start, right_start, m, run_re_c, opts, sc, 
-      seq_begin, seq_end - seq_begin, pqs_storage,
-      pqs_cnt, left_res, false, chrono::system_clock::now(),
-      INT_MAX, 0, fn_call_count
-    );
-    pqs_storage.export_pqs(left_res);
-  }
-}
-
-
-/**
- * Find PQS overlapping from right that were missed during fast search
- * 
- * @param subject
- * @param seq_begin Beginning of DNA sequence
- * @param seq_end End of DNA sequence
- * @param run_re_c
- * @param sc
- * @param opts
- * @param res
- * @param right_res
- * @param pqs_storage
- * @param fn_call_count
- */
-void find_overscored_right_overlapping_pqs(
-    SEXP subject,
-    const string::const_iterator seq_begin,
-    const string::const_iterator seq_end,
-    const boost::regex &run_re_c,
-    const scoring &sc,
-    const opts_t &opts,
-    results &res,
-    results &right_res,
-    storage &pqs_storage,
-    int &fn_call_count
-)
-{
-  run_match m[RUN_CNT];
-  int pqs_cnt = 0;
-  string::const_iterator left_end, right_start, right_end, next_pqs_start;
-  
-  for (size_t i = 0; i < res.items.size(); ++i) {
-    
-    left_end = res.items[i].start;
-    right_start = res.items[i].start + res.items[i].len;
-    
-    // if (i == res.items.size() - 1) {
-      right_end = min(right_start + opts.max_len, seq_end);
-    // } else {
-    //   next_pqs_start = res.items[i+1].start;
-    //   right_end = min(right_start + opts.max_len, next_pqs_start);
-    // }
-    if (opts.verbose) {
-      Rcout << "region " <<
-        left_end - seq_begin + 1 << "-" <<
-          right_end - seq_begin <<  endl;
-    }
-    find_all_runs(
-      subject, 0, left_end, right_end, m, run_re_c, opts, sc, 
-      seq_begin, seq_end - seq_begin, pqs_storage,
-      pqs_cnt, right_res, false, chrono::system_clock::now(),
-      INT_MAX, 0, fn_call_count
-    );
-    pqs_storage.export_pqs(right_res);
-  }
-}
-
 
 /**
  * Split sequence into individual chunks with sufficient overlap
@@ -974,15 +724,15 @@ void find_pqs(
     results c_res(seq_end - seq_begin, opts.min_score, seq_begin);
     
     find_overscored_pqs<Overscored::SELF>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, res, a_res, pqs_storage, fn_call_count
+      subject, seq_begin, seq_end, run_re_c, sc, opts, res, a_res, fn_call_count
     );
     // a_res = self overscored
     
     find_overscored_pqs<Overscored::LEFT_BOUND>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, pqs_storage, fn_call_count
+      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, fn_call_count
     );
     find_overscored_pqs<Overscored::LEFT_UNBOUND>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, c_res, pqs_storage, fn_call_count
+      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, c_res, fn_call_count
     );
     // b_res = left bound
     // c_res = left unbound
@@ -990,19 +740,54 @@ void find_pqs(
     // a_res = left (un)bound
     
     find_overscored_pqs<Overscored::RIGHT_BOUND>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, pqs_storage, fn_call_count
+      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, fn_call_count
     );
     merge_res_items(a_res, b_res, c_res);
     // c_res = left (un)bound + right bound
     
     find_overscored_pqs<Overscored::RIGHT_UNBOUND>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, pqs_storage, fn_call_count
+      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, fn_call_count
     );
     merge_res_items(c_res, b_res, a_res);
     // c_res = left (un)bound + right (un)bound
 
     find_overscored_pqs<Overscored::NEIGHBOURING>(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, pqs_storage, fn_call_count
+      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, fn_call_count
+    );
+    merge_res_items(a_res, b_res, res);
+    // res = left (un)bound + right (un)bound + neighbouring
+    
+    
+    find_overscored_pqs<Overscored::SELF>(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, res, a_res, fn_call_count
+    );
+    // a_res = self overscored
+    
+    find_overscored_pqs<Overscored::LEFT_BOUND>(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, fn_call_count
+    );
+    find_overscored_pqs<Overscored::LEFT_UNBOUND>(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, c_res, fn_call_count
+    );
+    // b_res = left bound
+    // c_res = left unbound
+    merge_res_items(b_res, c_res, a_res);
+    // a_res = left (un)bound
+    
+    find_overscored_pqs<Overscored::RIGHT_BOUND>(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, fn_call_count
+    );
+    merge_res_items(a_res, b_res, c_res);
+    // c_res = left (un)bound + right bound
+    
+    find_overscored_pqs<Overscored::RIGHT_UNBOUND>(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, fn_call_count
+    );
+    merge_res_items(c_res, b_res, a_res);
+    // c_res = left (un)bound + right (un)bound
+    
+    find_overscored_pqs<Overscored::NEIGHBOURING>(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, a_res, b_res, fn_call_count
     );
     merge_res_items(a_res, b_res, res);
     // res = left (un)bound + right (un)bound + neighbouring

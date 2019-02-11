@@ -21,11 +21,11 @@
 namespace Overscored {
 enum type_t {
   SELF,
-  NEIGHBOURING,
   LEFT_BOUND,
   LEFT_UNBOUND,
   RIGHT_BOUND,
   RIGHT_UNBOUND,
+  NEIGHBOURING,
 };
 }
 
@@ -53,7 +53,6 @@ void find_overscored_pqs(
     const opts_t &opts,
     results &res,
     results &new_res,
-    storage &pqs_storage,
     int &fn_call_count
 )
 {
@@ -61,10 +60,12 @@ void find_overscored_pqs(
   int pqs_cnt = 0;
   string::const_iterator left_start, left_end, right_start, right_end, next_pqs_start, prev_pqs_end, search_start, search_end;
   
-  // sort results to have them in sequence order
-  res.sort_items();
+  res.sort_items(); // sort results to have them in sequence order
+  new_res.items.clear();
   
   for (size_t i = 0; i < res.items.size(); ++i) {
+    
+    revised_non_overlapping_storage pqs_storage(seq_begin);
     
     left_end = res.items[i].start;
     right_start = res.items[i].start + res.items[i].len;
@@ -112,6 +113,7 @@ void find_overscored_pqs(
         );
       }
     } else if (type == Overscored::LEFT_BOUND) {
+      Rcout << "region " << left_start - seq_begin + 1 << "-" << right_start - seq_begin << endl;
       find_all_runs(
         subject, 0, left_start, right_start, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
@@ -141,7 +143,15 @@ void find_overscored_pqs(
       );
     }
     pqs_storage.export_pqs(new_res);
+    
+    if (type == Overscored::LEFT_BOUND) {
+      new_res.print();
+    }
   }
+  
+  Rcout << "After solve overscored " << type << endl;
+  new_res.sort_items();
+  new_res.print();
 }
 
 #endif // OVERSCORED_HEADER

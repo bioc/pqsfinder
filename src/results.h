@@ -97,7 +97,8 @@ public:
   inline void print() const {
     Rcout << "Results" << endl;
     for (unsigned i = 0; i < this->items.size(); i++) {
-      Rcout << "PQS[" << i << "]: " << this->items[i].start - this->ref + 1 << " "
+      Rcout << "PQS[" << i << "]: " << this->items[i].start - this->ref + 1 
+            << "-" << this->items[i].start + this->items[i].len - this->ref << " "
             << string(this->items[i].start, this->items[i].start + this->items[i].len)
             << " " << this->items[i].score << endl;
     }

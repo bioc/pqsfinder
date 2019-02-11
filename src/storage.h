@@ -216,4 +216,24 @@ public:
   }
 };
 
+
+/**
+ * Select between overlapping and non-overlapping storage.
+ * 
+ * @param overlapping If report overlapping PQS.
+ * @param ov Overlapping storage.
+ * @param nov Non-overlapping storage.
+ * @return Reference to storage interface.
+ */
+storage &select_pqs_storage(
+    bool overlapping,
+    overlapping_storage &ov,
+    revised_non_overlapping_storage &nov)
+{
+  if (overlapping)
+    return ov;
+  else
+    return nov;
+}
+
 #endif // STORAGE_HEADER
