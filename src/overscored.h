@@ -60,14 +60,15 @@ void find_overscored_pqs(
 {
   run_match m[RUN_CNT];
   int pqs_cnt = 0;
-  string::const_iterator left_start, left_end, right_start, right_end, next_pqs_start, prev_pqs_end, search_start, search_end;
+  string::const_iterator left_start, left_end, right_start, right_end,
+    next_pqs_start, prev_pqs_end, search_start, search_end, left_unbound, right_unbound;
   
   res.sort_items(); // sort results to have them in sequence order
   new_res.items.clear();
   
   for (size_t i = 0; i < res.items.size(); ++i) {
     
-    new_res.clear_max_scores();
+    // new_res.clear_max_scores();
     
     revised_non_overlapping_storage pqs_storage(seq_begin);
     
@@ -92,6 +93,14 @@ void find_overscored_pqs(
         right_end = next_pqs_start; // extend search region
       }
     }
+    left_unbound = max(left_end - opts.max_len, seq_begin);
+    right_unbound = min(right_start + opts.max_len, seq_end);
+    
+    // clear max scores in the region
+    for (int i = left_unbound - seq_begin; i < right_unbound - seq_begin; ++i) {
+      new_res.max_scores[i] = 0;
+    }
+    
     if (type == Overscored::SELF) {
       find_all_runs(
         subject, 0, left_end, right_start, m, run_re_c, opts, sc, 
@@ -126,7 +135,7 @@ void find_overscored_pqs(
       );
     } else if (type == Overscored::LEFT_UNBOUND) {
       find_all_runs(
-        subject, 0, max(left_end - opts.max_len, seq_begin), right_start, m, run_re_c, opts, sc, 
+        subject, 0, left_unbound, right_start, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
         pqs_cnt, new_res, false, chrono::system_clock::now(),
         INT_MAX, 0, fn_call_count
@@ -141,7 +150,7 @@ void find_overscored_pqs(
     } else if (type == Overscored::RIGHT_UNBOUND) {
       // Rcout << "region " << left_end - seq_begin + 1 << "-" <<  min(right_start + opts.max_len, seq_end) - seq_begin << endl;
       find_all_runs(
-        subject, 0, left_end, min(right_start + opts.max_len, seq_end), m, run_re_c, opts, sc, 
+        subject, 0, left_end, right_unbound, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
         pqs_cnt, new_res, false, chrono::system_clock::now(),
         INT_MAX, 0, fn_call_count

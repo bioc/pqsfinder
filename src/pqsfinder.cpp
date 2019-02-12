@@ -154,7 +154,8 @@ inline int score_run_defects(
       ++mismatches;
     } else if (w[i] > w[pi] && g[i] >= g[pi]) {
       ++bulges;
-      score = score - (int) round(sc.bulge_len_factor * pow(w[i] - w[pi], sc.bulge_len_exponent));
+      // score = score - (int) round(sc.bulge_len_factor * pow(w[i] - w[pi], sc.bulge_len_exponent));
+      score = score - sc.bulge_penalties[w[i] - w[pi]];
     } else {
       return 0;
     }
@@ -1095,6 +1096,7 @@ SEXP pqsfinder(
   sc.max_mimatches = max_mismatches;
   sc.max_defects = max_defects;
   sc.init_loop_penalties(opts.loop_max_len);
+  sc.init_bulge_penalties(opts.run_max_len);
 
   string seq = as<string>(as_character(subject));
   Function reverseComplement("reverseComplement");
