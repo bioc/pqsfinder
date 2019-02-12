@@ -468,7 +468,7 @@ inline search_progress_t search_progress(
  * @param pqs_start Start of the first G-run
  * @param pqs_storage Storage object
  * @param vec_cache Candidate cache entry
- * @param pqs_cnt PQS counter
+ * @param int_cnt PQS counter
  * @param res Object for output PQS
  * @param zero_loop Flag, if PQS has zero-length loop
  * @param s_time Starting time
@@ -485,7 +485,7 @@ void find_all_runs(
     const string::const_iterator &ref,
     const size_t len,
     storage &pqs_storage,
-    int &pqs_cnt,
+    int &int_cnt,
     results &res,
     bool zero_loop,
     const chrono::system_clock::time_point s_time,
@@ -501,6 +501,22 @@ void find_all_runs(
   int max_score = 0;
   
   ++fn_call_count;
+  ++int_cnt;
+  
+  /* Check user interrupt after reasonable amount of runs matched
+   * on important user signals. E.g. the user might want to abort the computation. */
+  if (opts.threads == 1 && int_cnt > opts.check_int_period)
+  {
+    int_cnt = 0;
+    checkUserInterrupt();
+    
+    if (!opts.verbose) {
+      search_progress_t sp = search_progress(start, ref, len, s_time);
+      char buffer[10];
+      sprintf(buffer, "%02d:%02d:%02d", sp.hours, sp.minutes, sp.seconds);
+      Rcout << "Search status: " << sp.percents << "% ETTC " << string(buffer) << "\r" << flush;
+    }
+  }
 
   if (i > 0) {
     loop_len = start - m[i-1].second;
@@ -555,7 +571,7 @@ void find_all_runs(
         // enforce G4 total length limit to be relative to the first G-run start
         find_all_runs(
           subject, i+1, e, min(s + opts.max_len, end), m, run_re_c, opts,
-          sc, ref, len, pqs_storage, pqs_cnt, res,
+          sc, ref, len, pqs_storage, int_cnt, res,
           false, s_time, next_tetrad_count, next_defect_count, fn_call_count
         );
       } else if (i < 3) {
@@ -565,25 +581,10 @@ void find_all_runs(
         }
         find_all_runs(
           subject, i+1, e, end, m, run_re_c, opts, sc, ref, len,
-          pqs_storage, pqs_cnt, res,
+          pqs_storage, int_cnt, res,
           (loop_len == 0 ? true : zero_loop), s_time, next_tetrad_count, next_defect_count, fn_call_count
         );
       } else {
-        /* Check user interrupt after reasonable amount of PQS scored to react
-         * on important user signals. E.g. the user might want to abort the computation. */
-        if (opts.threads == 1 && ++pqs_cnt == opts.check_int_period)
-        {
-          pqs_cnt = 0;
-          checkUserInterrupt();
-          
-          if (!opts.verbose) {
-            search_progress_t sp = search_progress(m[0].first, ref, len, s_time);
-            char buffer[10];
-            sprintf(buffer, "%02d:%02d:%02d", sp.hours, sp.minutes, sp.seconds);
-            
-            Rcout << "Search status: " << sp.percents << "% ETTC " << string(buffer) << "\r" << flush;
-          }
-        }
         score = 0;
         features_t pqs_features;
         if (opts.use_default_scoring) {
@@ -757,17 +758,17 @@ void find_pqs(
     results &res)
 {
   run_match m[RUN_CNT];
-  int pqs_cnt = 0;
   overlapping_storage ov_storage(seq_begin);
   revised_non_overlapping_storage nov_storage(seq_begin);
   storage &pqs_storage = select_pqs_storage(opts.overlapping, ov_storage, nov_storage);
   
   int fn_call_count = 0;
+  int int_cnt = 0;
   
   // Global sequence length is the only limit for the first G-run
   find_all_runs(
     subject, 0, seq_begin, seq_end, m, run_re_c, opts, sc,
-    seq_begin, seq_end - seq_begin, pqs_storage, pqs_cnt,
+    seq_begin, seq_end - seq_begin, pqs_storage, int_cnt,
     res, false, chrono::system_clock::now(), INT_MAX, 0, fn_call_count
   );
   pqs_storage.export_pqs(res);
@@ -783,6 +784,8 @@ void find_pqs(
     }
     Rcout << "find_all_overscored_pqs iteration: " << iter_count << endl;
   }
+  
+  Rcout << "fn_call_count " << fn_call_count << endl;
 }
 
 
@@ -1078,7 +1081,7 @@ SEXP pqsfinder(
   if (opts.use_re) {
     opts.check_int_period = 1e6;
   } else {
-    opts.check_int_period = 1e7;
+    opts.check_int_period = 1e6;
   }
   if (opts.overlapping) {
     // cannot use optimization when searching for overlapping G4s
