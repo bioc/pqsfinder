@@ -106,7 +106,7 @@ void find_overscored_pqs(
         subject, 0, left_end, right_start, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
         pqs_cnt, new_res, false, chrono::system_clock::now(),
-        INT_MAX, 0, fn_call_count
+        INT_MAX, 0, fn_call_count, false
       );
     } else if (type == Overscored::NEIGHBOURING) {
       if (left_end - left_start > opts.run_min_len * 4) {
@@ -114,7 +114,7 @@ void find_overscored_pqs(
           subject, 0, left_start, left_end, m, run_re_c, opts, sc, 
           seq_begin, seq_end - seq_begin, pqs_storage,
           pqs_cnt, new_res, false, chrono::system_clock::now(),
-          INT_MAX, 0, fn_call_count
+          INT_MAX, 0, fn_call_count, false
         );
       }
       if (right_end - right_start > opts.run_min_len * 4) {
@@ -122,7 +122,7 @@ void find_overscored_pqs(
           subject, 0, right_start, right_end, m, run_re_c, opts, sc, 
           seq_begin, seq_end - seq_begin, pqs_storage,
           pqs_cnt, new_res, false, chrono::system_clock::now(),
-          INT_MAX, 0, fn_call_count
+          INT_MAX, 0, fn_call_count, false
         );
       }
     } else if (type == Overscored::LEFT_BOUND) {
@@ -131,21 +131,21 @@ void find_overscored_pqs(
         subject, 0, left_start, right_start, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
         pqs_cnt, new_res, false, chrono::system_clock::now(),
-        INT_MAX, 0, fn_call_count
+        INT_MAX, 0, fn_call_count, false
       );
     } else if (type == Overscored::LEFT_UNBOUND) {
       find_all_runs(
         subject, 0, left_unbound, right_start, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
         pqs_cnt, new_res, false, chrono::system_clock::now(),
-        INT_MAX, 0, fn_call_count
+        INT_MAX, 0, fn_call_count, false
       );
     } else if (type == Overscored::RIGHT_BOUND) {
       find_all_runs(
         subject, 0, left_end, right_end, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
         pqs_cnt, new_res, false, chrono::system_clock::now(),
-        INT_MAX, 0, fn_call_count
+        INT_MAX, 0, fn_call_count, false
       );
     } else if (type == Overscored::RIGHT_UNBOUND) {
       // Rcout << "region " << left_end - seq_begin + 1 << "-" <<  min(right_start + opts.max_len, seq_end) - seq_begin << endl;
@@ -153,14 +153,14 @@ void find_overscored_pqs(
         subject, 0, left_end, right_unbound, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
         pqs_cnt, new_res, false, chrono::system_clock::now(),
-        INT_MAX, 0, fn_call_count
+        INT_MAX, 0, fn_call_count, false
       );
     } else if (type == Overscored::NEIGHBOURING_SELF) {
       find_all_runs(
         subject, 0, left_start, right_end, m, run_re_c, opts, sc, 
         seq_begin, seq_end - seq_begin, pqs_storage,
         pqs_cnt, new_res, false, chrono::system_clock::now(),
-        INT_MAX, 0, fn_call_count
+        INT_MAX, 0, fn_call_count, false
       );
     }
     pqs_storage.export_pqs(new_res);

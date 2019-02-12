@@ -491,7 +491,8 @@ void find_all_runs(
     const chrono::system_clock::time_point s_time,
     int tetrad_count,
     int defect_count,
-    int &fn_call_count)
+    int &fn_call_count,
+    bool show_progress)
 {
   string::const_iterator s, e, min_e;
   int score, loop_len;
@@ -510,7 +511,7 @@ void find_all_runs(
     int_cnt = 0;
     checkUserInterrupt();
     
-    if (!opts.verbose) {
+    if (show_progress && !opts.verbose) {
       search_progress_t sp = search_progress(start, ref, len, s_time);
       char buffer[10];
       sprintf(buffer, "%02d:%02d:%02d", sp.hours, sp.minutes, sp.seconds);
@@ -571,8 +572,8 @@ void find_all_runs(
         // enforce G4 total length limit to be relative to the first G-run start
         find_all_runs(
           subject, i+1, e, min(s + opts.max_len, end), m, run_re_c, opts,
-          sc, ref, len, pqs_storage, int_cnt, res,
-          false, s_time, next_tetrad_count, next_defect_count, fn_call_count
+          sc, ref, len, pqs_storage, int_cnt, res, false,
+          s_time, next_tetrad_count, next_defect_count, fn_call_count, show_progress
         );
       } else if (i < 3) {
         loop_len = s - m[i-1].second;
@@ -581,8 +582,8 @@ void find_all_runs(
         }
         find_all_runs(
           subject, i+1, e, end, m, run_re_c, opts, sc, ref, len,
-          pqs_storage, int_cnt, res,
-          (loop_len == 0 ? true : zero_loop), s_time, next_tetrad_count, next_defect_count, fn_call_count
+          pqs_storage, int_cnt, res, (loop_len == 0 ? true : zero_loop),
+          s_time, next_tetrad_count, next_defect_count, fn_call_count, show_progress
         );
       } else {
         score = 0;
@@ -769,7 +770,7 @@ void find_pqs(
   find_all_runs(
     subject, 0, seq_begin, seq_end, m, run_re_c, opts, sc,
     seq_begin, seq_end - seq_begin, pqs_storage, int_cnt,
-    res, false, chrono::system_clock::now(), INT_MAX, 0, fn_call_count
+    res, false, chrono::system_clock::now(), INT_MAX, 0, fn_call_count, true
   );
   pqs_storage.export_pqs(res);
   
@@ -782,10 +783,7 @@ void find_pqs(
       prev_count = res.items.size();
       find_all_overscored_pqs(subject, seq_begin, seq_end, run_re_c, sc, opts, res, fn_call_count);
     }
-    Rcout << "find_all_overscored_pqs iteration: " << iter_count << endl;
   }
-  
-  Rcout << "fn_call_count " << fn_call_count << endl;
 }
 
 
