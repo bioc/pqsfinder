@@ -8,7 +8,7 @@
  * Package: pqsfinder
  */
 
-#define GPERF_ENABLED
+// #define GPERF_ENABLED
 
 #include <Rcpp.h>
 #include <string>
@@ -594,17 +594,20 @@ void find_all_runs(
         if ((score || !opts.use_default_scoring) && sc.custom_scoring_fn != NULL) {
           check_custom_scoring_fn(score, m, sc, subject, ref);
         }
-        if (score >= opts.min_score) {
+        if (score >= opts.min_score && !(opts.fast && score < res.max_scores[m[0].first - ref])) {
           // current PQS satisfied all constraints
           pqs_storage.insert_pqs(score, m[0].first, m[3].second, pqs_features, res);
           
-          int pqs_len = m[3].second - m[0].first;
-          int offset = m[0].first - ref;
-          
-          for (int k = 0; k < pqs_len; ++k) {
-            res.max_scores[offset + k] = max(res.max_scores[offset + k], score);
-            ++res.density[offset + k];
+          if (!opts.fast) {
+            int pqs_len = m[3].second - m[0].first;
+            int offset = m[0].first - ref;
+            
+            for (int k = 0; k < pqs_len; ++k) {
+              res.max_scores[offset + k] = max(res.max_scores[offset + k], score);
+              ++res.density[offset + k];
+            }
           }
+          
           if (opts.verbose)
             print_pqs(m, score, ref);
         }
@@ -737,6 +740,102 @@ void find_all_overscored_pqs(
   // res = left (un)bound + right (un)bound + neighbouring + neighbouring self
 }
 
+void find_overscored(
+    SEXP subject,
+    const string::const_iterator seq_begin,
+    const string::const_iterator seq_end,
+    const boost::regex &run_re_c,
+    const scoring &sc,
+    const opts_t &opts,
+    results &res,
+    results &new_res,
+    int &fn_call_count
+)
+{
+  run_match m[RUN_CNT];
+  int pqs_cnt = 0;
+  string::const_iterator left_start, left_end, right_start, right_end,
+  next_pqs_start, prev_pqs_end, search_start, search_end;
+  
+  fast_non_overlapping_storage pqs_storage(seq_begin);
+  
+  for (size_t i = 0; i < res.items.size(); ++i) {
+    
+    left_end = res.items[i].start;
+    right_start = res.items[i].start + res.items[i].len;
+    
+    if (i == 0) {
+      left_start = seq_begin; //max(left_end - 2*opts.max_len, seq_begin);
+    } else {
+      prev_pqs_end = res.items[i-1].start + res.items[i-1].len;
+      left_start = prev_pqs_end; // max(left_end - opts.max_len, prev_pqs_end);
+      if (left_start - prev_pqs_end < opts.max_len) {
+        left_start = left_end; // do not search again
+      }
+    }
+    if (i == res.items.size() - 1) {
+      right_end = seq_end; //min(right_start + 2*opts.max_len, seq_end);
+    } else {
+      next_pqs_start = res.items[i+1].start;
+      right_end = next_pqs_start; //min(right_start + opts.max_len, next_pqs_start);
+      if (next_pqs_start - right_end < opts.max_len) {
+        right_end = next_pqs_start; // extend search region
+      }
+    }
+    // left side
+    if (left_end - left_start > opts.run_min_len * 4) {
+      find_all_runs(
+        subject, 0, left_start, left_end, m, run_re_c, opts, sc, 
+        seq_begin, seq_end - seq_begin, pqs_storage,
+        pqs_cnt, new_res, false, chrono::system_clock::now(),
+        INT_MAX, 0, fn_call_count, false
+      );
+    }
+    // right side
+    if (right_end - right_start > opts.run_min_len * 4) {
+      find_all_runs(
+        subject, 0, right_start, right_end, m, run_re_c, opts, sc, 
+        seq_begin, seq_end - seq_begin, pqs_storage,
+        pqs_cnt, new_res, false, chrono::system_clock::now(),
+        INT_MAX, 0, fn_call_count, false
+      );
+    }
+  }
+  pqs_storage.export_pqs(new_res);
+}
+
+
+void find_all_overscored(
+    SEXP subject,
+    const string::const_iterator seq_begin,
+    const string::const_iterator seq_end,
+    const boost::regex &run_re_c,
+    const scoring &sc,
+    const opts_t &opts,
+    results &res,
+    int &fn_call_count)
+{
+  bool found = res.items.size();
+  
+  while (found) {
+    res.sort_items();
+    
+    results new_res(seq_end - seq_begin, opts.min_score, seq_begin);
+    
+    find_overscored(
+      subject, seq_begin, seq_end, run_re_c, sc, opts, res, new_res, fn_call_count
+    );
+    
+    Rcout << "Overscored:" << endl;
+    new_res.print();
+    
+    for (size_t i = 0; i < new_res.items.size(); ++i) {
+      res.items.push_back(new_res.items[i]);
+    }
+    found = new_res.items.size();
+  }
+}
+
 
 /**
  * Perform quadruplex search on given DNA sequence.
@@ -761,7 +860,8 @@ void find_pqs(
   run_match m[RUN_CNT];
   overlapping_storage ov_storage(seq_begin);
   revised_non_overlapping_storage nov_storage(seq_begin);
-  storage &pqs_storage = select_pqs_storage(opts.overlapping, ov_storage, nov_storage);
+  fast_non_overlapping_storage gnov_storage(seq_begin);
+  storage &pqs_storage = select_pqs_storage(opts, ov_storage, nov_storage, gnov_storage);
   
   int fn_call_count = 0;
   int int_cnt = 0;
@@ -775,15 +875,19 @@ void find_pqs(
   pqs_storage.export_pqs(res);
   
   if (opts.fast && !res.items.empty()) {
-    size_t prev_count = 0;
-    size_t iter_count = 0;
-    
-    while (prev_count != res.items.size()) {
-      ++iter_count;
-      prev_count = res.items.size();
-      find_all_overscored_pqs(subject, seq_begin, seq_end, run_re_c, sc, opts, res, fn_call_count);
-    }
+    find_all_overscored(subject, seq_begin, seq_end, run_re_c, sc, opts, res, fn_call_count);
   }
+  
+  // if (opts.fast && !res.items.empty()) {
+  //   size_t prev_count = 0;
+  //   size_t iter_count = 0;
+  //   
+  //   while (prev_count != res.items.size()) {
+  //     ++iter_count;
+  //     prev_count = res.items.size();
+  //     find_all_overscored_pqs(subject, seq_begin, seq_end, run_re_c, sc, opts, res, fn_call_count);
+  //   }
+  // }
 }
 
 
@@ -839,7 +943,8 @@ void merge_results(
 {
   overlapping_storage ov_storage(seq_begin);
   revised_non_overlapping_storage nov_storage(seq_begin);
-  storage &pqs_storage = select_pqs_storage(opts.overlapping, ov_storage, nov_storage);
+  fast_non_overlapping_storage gnov_storage(seq_begin);
+  storage &pqs_storage = select_pqs_storage(opts, ov_storage, nov_storage, gnov_storage);
   
   for (size_t i = 0; i < res_list.size(); ++i) {
     // sort partial results to have them in sequence order

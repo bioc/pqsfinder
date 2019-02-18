@@ -11,6 +11,7 @@
 
 #include <Rcpp.h>
 #include "features.h"
+#include "opts.h"
 #include "results.h"
 
 using namespace Rcpp;
@@ -99,7 +100,7 @@ private:
       s(s), e(e), f(f) {};
     range() {};
   };
-  typedef map< int, list<range> > storage_t;
+  typedef map< int, list<range> > storage_t; // map is always sorted by keys
   storage_t st;
   string::const_iterator last_e;
   
@@ -139,19 +140,35 @@ public:
     
     while (!this->st.empty()) {
       it = --this->st.end(); // decrement to point on last list
+      // [it] points on the highest scoring list of ranges
       
       // resolve overlaps between equal-scoring PQS
       prev = it->second.begin();
       curr = next(prev);
       
       while (curr != it->second.end()) {
-        if (prev->s <= curr->s && curr->e <= prev->e) {
-          it->second.erase(prev);
-          prev = curr;
-          ++curr;
-        } else if (prev->e > curr->s) {
-          it->second.erase(curr);
-          curr = std::next(prev);
+        // if (prev->s <= curr->s && curr->e <= prev->e) {
+        //   it->second.erase(prev);
+        //   prev = curr;
+        //   ++curr;
+        // } else if (prev->e > curr->s) {
+        //   it->second.erase(curr);
+        //   curr = next(prev);
+        // } else {
+        //   prev = curr;
+        //   ++curr;
+        // }
+        if (curr->s < prev->e) {
+          if ((curr->e - curr->s) < (prev->e - prev->s)) {
+            // curr is shorter
+            it->second.erase(prev);
+            prev = curr;
+            ++curr;
+          } else {
+            // prev is shorter or equal, so leave it
+            it->second.erase(curr);
+            curr = next(prev);
+          }
         } else {
           prev = curr;
           ++curr;
@@ -217,23 +234,81 @@ public:
 };
 
 
+class fast_non_overlapping_storage: public storage {
+private:
+  string::const_iterator best_s, best_e;
+  features_t best_f;
+  int best_score = 0;
+  
+public:
+  fast_non_overlapping_storage(string::const_iterator start) : best_e(start) {}
+  
+  virtual void insert_pqs(
+      int score, string::const_iterator s, string::const_iterator e, features_t &f,
+      results &res)
+  {
+    if (s >= this->best_e && this->best_score > 0)
+    {// export PQS because no further overlapping pqs can be found
+      this->export_pqs(res);
+    }
+    if (score > this->best_score ||
+        (score == this->best_score && (e - s) < (this->best_e - this->best_s))) {
+      
+      int pqs_len = e - s;
+      int offset = s - res.ref;
+      
+      for (int k = 0; k < pqs_len; ++k) {
+        res.max_scores[offset + k] = max(res.max_scores[offset + k], score);
+      }
+      
+      if (e < this->best_e) {
+        // reset max scores on the right side of the new best
+        int len = this->best_e - e;
+        int offset = e - res.ref;
+        
+        for (int k = 0; k < len; ++k) {
+          res.max_scores[offset + k] = 0;
+        }
+      }
+      this->best_score = score;
+      this->best_s = s;
+      this->best_e = e;
+      this->best_f = f;
+      // Rcout << "new best: " << s - res.ref + 1 << "-" << e - res.ref << " " << score << endl;
+    }
+  }
+  virtual void export_pqs(
+      results &res)
+  {
+    if (this->best_score > 0) {
+      res.save_pqs(this->best_score, this->best_s, this->best_e, this->best_f);
+      this->best_score = 0;
+    }
+  }
+};
+
+
 /**
  * Select between overlapping and non-overlapping storage.
  * 
- * @param overlapping If report overlapping PQS.
+ * @param opts Algorithm options.
  * @param ov Overlapping storage.
  * @param nov Non-overlapping storage.
  * @return Reference to storage interface.
  */
 storage &select_pqs_storage(
-    bool overlapping,
+    const opts_t &opts,
     overlapping_storage &ov,
-    revised_non_overlapping_storage &nov)
+    revised_non_overlapping_storage &nov,
+    fast_non_overlapping_storage &gnov)
 {
-  if (overlapping)
+  if (opts.overlapping) {
     return ov;
-  else
+  } else if (opts.fast) {
+    return gnov;
+  } else {
     return nov;
+  }
 }
 
 #endif // STORAGE_HEADER
