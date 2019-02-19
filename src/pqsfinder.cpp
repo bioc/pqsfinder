@@ -20,7 +20,6 @@
 #include <chrono>
 #include <thread>
 #include <boost/regex.hpp>
-#include <boost/thread.hpp>
 #ifdef GPERF_ENABLED
 #include <gperftools/profiler.h>
 #endif
@@ -868,9 +867,7 @@ void find_pqs_parallel(
     vector<seq_chunk_t> chunk_list = split_seq_to_chunks(seq, opts);
     
     size_t num_threads = min(chunk_list.size(), opts.threads);
-    boost::thread *tt;
-    
-    boost::thread::attributes attrs;
+    std::thread *tt;
     
     // initialize result objects
     vector<results> res_list; //(chunk_list.size());
@@ -879,10 +876,10 @@ void find_pqs_parallel(
     }
     if (num_threads > 1) {
       // run additional threads
-      tt = new boost::thread[num_threads - 1];
+      tt = new std::thread[num_threads - 1];
       for (size_t tid = 1; tid < num_threads; ++tid) {
-        tt[tid - 1] = boost::thread(
-          attrs, boost::bind(find_pqs_thread, tid, num_threads, std::ref(chunk_list), std::ref(res_list),
+        tt[tid - 1] = std::thread(
+          std::bind(find_pqs_thread, tid, num_threads, std::ref(chunk_list), std::ref(res_list),
           subject, std::ref(run_re_c), std::ref(sc), std::ref(opts))
         );
       }

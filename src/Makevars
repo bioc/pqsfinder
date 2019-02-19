@@ -6,7 +6,7 @@ ifneq (,)
 This makefile requires GNU Make.
 endif
 
-BOOSTSRC=${wildcard boost_regex/*.cpp} ${wildcard boost_thread/*.cpp} ${wildcard boost_thread/pthread/*.cpp}
+BOOSTSRC=${wildcard boost_regex/*.cpp}
 BOOSTOBJS=${BOOSTSRC:.cpp=.o}
 
 BOOSTLIB = libboost.a
