@@ -24,7 +24,6 @@
 #ifdef GPERF_ENABLED
 #include <gperftools/profiler.h>
 #endif
-#include "overscored.h"
 #include "pqsfinder.h"
 
 using namespace Rcpp;
@@ -658,87 +657,6 @@ vector<seq_chunk_t> split_seq_to_chunks(
   return chunk_list;
 }
 
-
-void merge_res_items(results &a, results &b, results &merged) {
-  revised_non_overlapping_storage pqs_storage(merged.ref);
-  
-  // sort results to have them in sequence order
-  a.sort_items();
-  b.sort_items();
-  
-  merged.items.clear(); // clear only result items (not vectors)
-  vector<results::item_t>::const_iterator left_it = a.items.begin();
-  vector<results::item_t>::const_iterator right_it = b.items.begin();
-  
-  while (left_it != a.items.end() || right_it != b.items.end()) {
-    if ((left_it != a.items.end() && right_it == b.items.end()) ||
-        (left_it != a.items.end() && right_it != b.items.end() && left_it->start < right_it->start)) {
-      pqs_storage.insert_pqs_item(*left_it, merged);
-      ++left_it;
-    } else {
-      pqs_storage.insert_pqs_item(*right_it, merged);
-      ++right_it;
-    }
-  }
-  pqs_storage.export_pqs(merged);
-}
-
-
-void find_all_overscored_pqs(
-    SEXP subject,
-    const string::const_iterator seq_begin,
-    const string::const_iterator seq_end,
-    const boost::regex &run_re_c,
-    const scoring &sc,
-    const opts_t &opts,
-    results &res,
-    int &fn_call_count)
-{
-  results self_res(seq_end - seq_begin, opts.min_score, seq_begin, opts.max_len);
-  results a_res(seq_end - seq_begin, opts.min_score, seq_begin, opts.max_len);
-  results b_res(seq_end - seq_begin, opts.min_score, seq_begin, opts.max_len);
-  results c_res(seq_end - seq_begin, opts.min_score, seq_begin, opts.max_len);
-  
-  find_overscored_pqs<Overscored::SELF>(
-    subject, seq_begin, seq_end, run_re_c, sc, opts, res, self_res, fn_call_count
-  );
-  // self_res = self overscored
-  
-  find_overscored_pqs<Overscored::LEFT_BOUND>(
-    subject, seq_begin, seq_end, run_re_c, sc, opts, self_res, a_res, fn_call_count
-  );
-  find_overscored_pqs<Overscored::LEFT_UNBOUND>(
-    subject, seq_begin, seq_end, run_re_c, sc, opts, self_res, b_res, fn_call_count
-  );
-  // a_res = left bound
-  // b_res = left unbound
-  merge_res_items(a_res, b_res, c_res);
-  // c_res = left (un)bound
-  
-  find_overscored_pqs<Overscored::RIGHT_BOUND>(
-    subject, seq_begin, seq_end, run_re_c, sc, opts, self_res, a_res, fn_call_count
-  );
-  merge_res_items(c_res, a_res, b_res);
-  // b_res = left (un)bound + right bound
-  
-  find_overscored_pqs<Overscored::RIGHT_UNBOUND>(
-    subject, seq_begin, seq_end, run_re_c, sc, opts, self_res, a_res, fn_call_count
-  );
-  merge_res_items(b_res, a_res, c_res);
-  // c_res = left (un)bound + right (un)bound
-  
-  find_overscored_pqs<Overscored::NEIGHBOURING>(
-    subject, seq_begin, seq_end, run_re_c, sc, opts, c_res, a_res, fn_call_count
-  );
-  merge_res_items(c_res, a_res, b_res);
-  // b_res = left (un)bound + right (un)bound + neighbouring
-  
-  find_overscored_pqs<Overscored::NEIGHBOURING_SELF>(
-    subject, seq_begin, seq_end, run_re_c, sc, opts, b_res, a_res, fn_call_count
-  );
-  merge_res_items(b_res, a_res, res);
-  // res = left (un)bound + right (un)bound + neighbouring + neighbouring self
-}
 
 void find_overscored(
     SEXP subject,
