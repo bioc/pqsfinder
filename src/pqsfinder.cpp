@@ -490,6 +490,7 @@ void find_all_runs(
     const chrono::system_clock::time_point s_time,
     int tetrad_count,
     int defect_count,
+    // int loop_sum,
     int &fn_call_count,
     bool show_progress)
 {
@@ -498,6 +499,7 @@ void find_all_runs(
   bool found_any;
   int next_tetrad_count = INT_MAX;
   int next_defect_count = 0;
+  int next_loop_sum = 0;
   int max_score = 0;
   
   ++fn_call_count;
@@ -540,7 +542,7 @@ void find_all_runs(
       s = string::const_iterator(m[i].first);
       e = string::const_iterator(m[i].second);
       
-      if (opts.fast && i < 3) {
+      if (opts.fast) {
         
         if (m[i].length() == m[i].g_count + 1) {
           // might be a run containing mismatch
@@ -606,7 +608,6 @@ void find_all_runs(
               ++res.density[offset + k];
             }
           }
-          
           if (opts.verbose)
             print_pqs(m, score, ref);
         }

@@ -37,6 +37,7 @@ void find_all_runs(
     const chrono::system_clock::time_point s_time,
     int tetrad_count,
     int defect_count,
+    // int loop_sum,
     int &fn_call_count,
     bool show_progress);
 
