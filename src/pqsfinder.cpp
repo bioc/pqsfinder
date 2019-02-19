@@ -490,7 +490,7 @@ void find_all_runs(
     const chrono::system_clock::time_point s_time,
     int tetrad_count,
     int defect_count,
-    // int loop_sum,
+    int loop_sum,
     int &fn_call_count,
     bool show_progress)
 {
@@ -551,10 +551,16 @@ void find_all_runs(
           // perfect or bulged run
           next_tetrad_count = min(tetrad_count, m[i].g_count);
         }
+        if (i > 0) {
+          next_loop_sum = loop_sum + (m[i].first - m[i-1].second);
+        } else {
+          next_loop_sum = loop_sum;
+        }
         next_defect_count = defect_count + (m[i].length() != m[i].g_count);
         
         max_score = (next_tetrad_count - 1) * sc.tetrad_bonus
-          - next_defect_count * min(sc.bulge_penalty, sc.mismatch_penalty);
+          - next_defect_count * min(sc.bulge_penalty, sc.mismatch_penalty)
+          - sc.loop_penalties[next_loop_sum];
         
         if (opts.verbose) {
           print_partial_pqs(m, i, ref);
@@ -565,7 +571,7 @@ void find_all_runs(
                 << endl;
         }
         if ((max_score < res.scores.get(m[0].first) || max_score < opts.min_score)) {
-          // comparison to min_score helps also quite a lot (2-3x speedup for default min_score)
+          // comparison to min_score helps quite a lot (2-3x speedup for default min_score)
           continue;
         }
       }
@@ -574,7 +580,7 @@ void find_all_runs(
         find_all_runs(
           subject, i+1, e, min(s + opts.max_len, end), m, run_re_c, opts,
           sc, ref, len, pqs_storage, int_cnt, res, false,
-          s_time, next_tetrad_count, next_defect_count, fn_call_count, show_progress
+          s_time, next_tetrad_count, next_defect_count, next_loop_sum, fn_call_count, show_progress
         );
       } else if (i < 3) {
         loop_len = s - m[i-1].second;
@@ -584,7 +590,7 @@ void find_all_runs(
         find_all_runs(
           subject, i+1, e, end, m, run_re_c, opts, sc, ref, len,
           pqs_storage, int_cnt, res, (loop_len == 0 ? true : zero_loop),
-          s_time, next_tetrad_count, next_defect_count, fn_call_count, show_progress
+          s_time, next_tetrad_count, next_defect_count, next_loop_sum, fn_call_count, show_progress
         );
       } else {
         score = 0;
@@ -702,7 +708,7 @@ void find_overscored(
       subject, 0, start, end, m, run_re_c, opts, sc, 
       seq_begin, seq_end - seq_begin, pqs_storage,
       pqs_cnt, new_res, false, chrono::system_clock::now(),
-      INT_MAX, 0, fn_call_count, false
+      INT_MAX, 0, 0, fn_call_count, false
     );
     pqs_storage.export_pqs(new_res);
     
@@ -749,7 +755,7 @@ void find_pqs(
   find_all_runs(
     subject, 0, seq_begin, seq_end, m, run_re_c, opts, sc,
     seq_begin, seq_end - seq_begin, pqs_storage, int_cnt,
-    res, false, chrono::system_clock::now(), INT_MAX, 0, fn_call_count, true
+    res, false, chrono::system_clock::now(), INT_MAX, 0, 0, fn_call_count, true
   );
   pqs_storage.export_pqs(res);
   
