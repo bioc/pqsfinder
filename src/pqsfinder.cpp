@@ -24,7 +24,11 @@
 #ifdef GPERF_ENABLED
 #include <gperftools/profiler.h>
 #endif
-#include "pqsfinder.h"
+#include "opts.h"
+#include "results.h"
+#include "run_match.h"
+#include "scoring.h"
+#include "storage.h"
 
 using namespace Rcpp;
 using namespace std;
@@ -1047,7 +1051,7 @@ SEXP pqsfinder(
   opts.run_max_len = run_max_len;
   opts.run_min_len = run_min_len;
   opts.threads = threads;
-  opts.chunk_size = 500 * max_len;
+  opts.chunk_size = 1e5;
   
   if (threads > 1) {
     // disable verbose mode
