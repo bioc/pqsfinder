@@ -12,12 +12,12 @@
 #include <Rcpp.h>
 #include <cstdlib>
 #include "features.h"
+#include "opts.h"
 #include "scores_buffer.h"
 
 using namespace Rcpp;
 using namespace std;
 
-static const size_t MAX_VECTOR_LENGTH = 100000;
 
 class results {
 public:
@@ -41,25 +41,21 @@ public:
   int *max_scores = NULL;
 
   size_t seq_len = 0;
-  int min_score = 1;
   string::const_iterator ref;
   
   scores_buffer scores;
   
-  results(const size_t seq_len, const int min_score,
-          const string::const_iterator ref, const int max_len) :
-    seq_len(seq_len), min_score(min_score), ref(ref), scores(seq_len, max_len, ref)
+  results(const size_t seq_len, const string::const_iterator ref, const opts_t &opts) :
+    seq_len(seq_len), ref(ref), scores(opts.max_len, ref)
   {
-    this->seq_len = seq_len;
-    this->min_score = min_score;
-    this->ref = ref;
-    
-    this->density = new int[seq_len];
-    this->max_scores = new int[seq_len];
-    
-    for (size_t i = 0; i < seq_len; ++i) {
-      this->density[i] = 0;
-      this->max_scores[i] = 0;
+    if (!opts.fast) {
+      this->density = new int[seq_len];
+      this->max_scores = new int[seq_len];
+      
+      for (size_t i = 0; i < seq_len; ++i) {
+        this->density[i] = 0;
+        this->max_scores[i] = 0;
+      }
     }
   }
   ~results() {
@@ -72,24 +68,22 @@ public:
       const int score, const string::const_iterator &s,
       const string::const_iterator &e, features_t &f)
   {
-    if (score >= this->min_score) {
-      results::item_t item;
-      
-      item.start = s;
-      item.len = e - s;
-      item.score = score;
-      item.nt = f.nt;
-      item.nb = f.nb;
-      item.nm = f.nm;
-      item.rl1 = f.rl1;
-      item.rl2 = f.rl2;
-      item.rl3 = f.rl3;
-      item.ll1 = f.ll1;
-      item.ll2 = f.ll2;
-      item.ll3 = f.ll3;
-      
-      this->items.push_back(item);
-    }
+    results::item_t item;
+    
+    item.start = s;
+    item.len = e - s;
+    item.score = score;
+    item.nt = f.nt;
+    item.nb = f.nb;
+    item.nm = f.nm;
+    item.rl1 = f.rl1;
+    item.rl2 = f.rl2;
+    item.rl3 = f.rl3;
+    item.ll1 = f.ll1;
+    item.ll2 = f.ll2;
+    item.ll3 = f.ll3;
+    
+    this->items.push_back(item);
   }
   inline void print() const {
     Rcout << "Results" << endl;

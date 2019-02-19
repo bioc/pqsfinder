@@ -8,7 +8,7 @@
  * Package: pqsfinder
  */
 
-// #define GPERF_ENABLED
+#define GPERF_ENABLED
 
 #include <Rcpp.h>
 #include <string>
@@ -558,11 +558,11 @@ void find_all_runs(
           print_partial_pqs(m, i, ref);
           Rcout << "next_tetrad_count: " << next_tetrad_count 
                 << " next_defect_count: " << next_defect_count
-                << " max_scores[0]: " << res.max_scores[m[0].first - ref]
+                << " max_scores[0]: " << res.scores.get(m[0].first)
                 << " max_score: " << max_score
                 << endl;
         }
-        if ((max_score < res.max_scores[m[0].first - ref] || max_score < opts.min_score)) {
+        if ((max_score < res.scores.get(m[0].first) || max_score < opts.min_score)) {
           // comparison to min_score helps also quite a lot (2-3x speedup for default min_score)
           continue;
         }
@@ -593,7 +593,7 @@ void find_all_runs(
         if ((score || !opts.use_default_scoring) && sc.custom_scoring_fn != NULL) {
           check_custom_scoring_fn(score, m, sc, subject, ref);
         }
-        if (score >= opts.min_score && !(opts.fast && score < res.max_scores[m[0].first - ref])) {
+        if (score >= opts.min_score) {
           // current PQS satisfied all constraints
           pqs_storage.insert_pqs(score, m[0].first, m[3].second, pqs_features, res);
           
@@ -738,7 +738,7 @@ void find_all_overscored(
   while (found) {
     res.sort_items();
     
-    results new_res(seq_end - seq_begin, opts.min_score, seq_begin, opts.max_len);
+    results new_res(seq_end - seq_begin, seq_begin, opts);
     
     find_overscored(
       subject, seq_begin, seq_end, run_re_c, sc, opts, res, new_res, fn_call_count
@@ -870,9 +870,11 @@ void merge_results(
     
     size_t offset = res_list[i].ref - seq_begin;
     
-    for (size_t k = 0; k < res_list[i].seq_len; ++k) {
-      res.max_scores[offset + k] = max(res.max_scores[offset + k], res_list[i].max_scores[k]);
-      res.density[offset + k] = max(res.density[offset + k], res_list[i].density[k]);
+    if (!opts.fast) {
+      for (size_t k = 0; k < res_list[i].seq_len; ++k) {
+        res.max_scores[offset + k] = max(res.max_scores[offset + k], res_list[i].max_scores[k]);
+        res.density[offset + k] = max(res.density[offset + k], res_list[i].density[k]);
+      }
     }
     for (size_t k = 0; k < res_list[i].items.size(); ++k) {
       pqs_storage.insert_pqs_item(res_list[i].items[k], res);
@@ -913,7 +915,7 @@ void find_pqs_parallel(
     // initialize result objects
     vector<results> res_list; //(chunk_list.size());
     for (size_t i = 0; i < chunk_list.size(); ++i) {
-      res_list.emplace_back(chunk_list[i].e - chunk_list[i].s, opts.min_score, chunk_list[i].s, opts.max_len);
+      res_list.emplace_back(chunk_list[i].e - chunk_list[i].s, chunk_list[i].s, opts);
     }
     if (num_threads > 1) {
       // run additional threads
@@ -1127,8 +1129,8 @@ SEXP pqsfinder(
   SEXP subject_rc = reverseComplement(subject);
   string seq_rc = as<string>(as_character(subject_rc));
 
-  results res_sense(seq.length(), opts.min_score, seq.begin(), opts.max_len);
-  results res_antisense(seq_rc.length(), opts.min_score, seq_rc.begin(), opts.max_len);
+  results res_sense(seq.length(), seq.begin(), opts);
+  results res_antisense(seq_rc.length(), seq_rc.begin(), opts);
   boost::regex run_re_c(run_re);
 
   if (opts.debug) {
@@ -1221,14 +1223,22 @@ SEXP pqsfinder(
     res_ll3[i] = res_antisense.items[k].ll3;
     ++i;
   }
-
-  IntegerVector res_density(seq.length());
-  IntegerVector res_max_scores(seq.length());
   
-  for (size_t i = 0; i < seq.length(); ++i) {
-    size_t antisense_i = seq.length() - i - 1;
-    res_density[i] = res_sense.density[i] + res_antisense.density[antisense_i];
-    res_max_scores[i] = max(res_sense.max_scores[i], res_antisense.max_scores[antisense_i]);
+  IntegerVector res_density;
+  IntegerVector res_max_scores;
+  
+  if (opts.fast) {
+    res_density = R_NaInt;
+    res_max_scores = R_NaInt;
+  } else {
+    res_density = IntegerVector(seq.length());
+    res_max_scores = IntegerVector(seq.length());
+
+    for (size_t i = 0; i < seq.length(); ++i) {
+      size_t antisense_i = seq.length() - i - 1;
+      res_density[i] = res_sense.density[i] + res_antisense.density[antisense_i];
+      res_max_scores[i] = max(res_sense.max_scores[i], res_antisense.max_scores[antisense_i]);
+    }
   }
   Function pqsviews("PQSViews");
   

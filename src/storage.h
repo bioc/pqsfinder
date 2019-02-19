@@ -254,21 +254,23 @@ public:
     if (score > this->best_score ||
         (score == this->best_score && (e - s) < (this->best_e - this->best_s))) {
       
-      int pqs_len = e - s;
-      int offset = s - res.ref;
-      
-      for (int k = 0; k < pqs_len; ++k) {
-        res.max_scores[offset + k] = max(res.max_scores[offset + k], score);
-      }
+      res.scores.move_and_set(s, e, score);
+      // int pqs_len = e - s;
+      // int offset = s - res.ref;
+      // 
+      // for (int k = 0; k < pqs_len; ++k) {
+      //   res.max_scores[offset + k] = max(res.max_scores[offset + k], score);
+      // }
       
       if (e < this->best_e) {
         // reset max scores on the right side of the new best
-        int len = this->best_e - e;
-        int offset = e - res.ref;
-        
-        for (int k = 0; k < len; ++k) {
-          res.max_scores[offset + k] = 0;
-        }
+        res.scores.clear_range(e, this->best_e);
+        // int len = this->best_e - e;
+        // int offset = e - res.ref;
+        // 
+        // for (int k = 0; k < len; ++k) {
+        //   res.max_scores[offset + k] = 0;
+        // }
       }
       this->best_score = score;
       this->best_s = s;
