@@ -14,7 +14,7 @@ USERDIR = ${R_PACKAGE_DIR}/lib${R_ARCH}
 USERLIB = ${USERDIR}/${BOOSTLIB}
 
 CXX_STD = CXX11
-PKG_LIBS = "${USERLIB}" -lprofiler
+PKG_LIBS = "${USERLIB}" #-lprofiler
 # put CXX11FLAGS += -O0... into ~/.R/Makevars to override default gcc flags
 
 .PHONY: all clean 
