@@ -12,6 +12,7 @@
 #include <Rcpp.h>
 #include <cstdlib>
 #include "features.h"
+#include "scores_buffer.h"
 
 using namespace Rcpp;
 using namespace std;
@@ -43,33 +44,29 @@ public:
   int min_score = 1;
   string::const_iterator ref;
   
-  results() {
-    
-  }
-  results(const size_t seq_len, const int min_score, const string::const_iterator ref) :
-    seq_len(seq_len), min_score(min_score), ref(ref)
+  scores_buffer scores;
+  
+  results(const size_t seq_len, const int min_score,
+          const string::const_iterator ref, const int max_len) :
+    seq_len(seq_len), min_score(min_score), ref(ref), scores(seq_len, max_len, ref)
   {
-    this->init(seq_len, min_score, ref);
-  }
-  ~results() {
-    if (this->density != NULL)
-      free(this->density);
-    if (this->max_scores != NULL)
-      free(this->max_scores);
-  }
-  void init(const size_t seq_len, const int min_score, const string::const_iterator ref) {
     this->seq_len = seq_len;
     this->min_score = min_score;
     this->ref = ref;
     
-    this->density = (int *)calloc(seq_len, sizeof(int));
-    if (this->density == NULL) {
-      throw runtime_error("Unable to allocate memory for results density vector.");
+    this->density = new int[seq_len];
+    this->max_scores = new int[seq_len];
+    
+    for (size_t i = 0; i < seq_len; ++i) {
+      this->density[i] = 0;
+      this->max_scores[i] = 0;
     }
-    this->max_scores = (int *)calloc(seq_len, sizeof(int));
-    if (this->max_scores == NULL) {
-      throw runtime_error("Unable to allocate memory for results score distribution vector.");
-    }
+  }
+  ~results() {
+    if (this->density != NULL)
+      delete [] this->density;
+    if (this->max_scores != NULL)
+      delete [] this->max_scores;
   }
   inline void save_pqs(
       const int score, const string::const_iterator &s,

@@ -43,7 +43,7 @@ using namespace std;
  */
 
 /*
- * TODO:
+ * TODO: Avoid using unsigned int (size_t)
  */
 
 
@@ -694,10 +694,10 @@ void find_all_overscored_pqs(
     results &res,
     int &fn_call_count)
 {
-  results self_res(seq_end - seq_begin, opts.min_score, seq_begin);
-  results a_res(seq_end - seq_begin, opts.min_score, seq_begin);
-  results b_res(seq_end - seq_begin, opts.min_score, seq_begin);
-  results c_res(seq_end - seq_begin, opts.min_score, seq_begin);
+  results self_res(seq_end - seq_begin, opts.min_score, seq_begin, opts.max_len);
+  results a_res(seq_end - seq_begin, opts.min_score, seq_begin, opts.max_len);
+  results b_res(seq_end - seq_begin, opts.min_score, seq_begin, opts.max_len);
+  results c_res(seq_end - seq_begin, opts.min_score, seq_begin, opts.max_len);
   
   find_overscored_pqs<Overscored::SELF>(
     subject, seq_begin, seq_end, run_re_c, sc, opts, res, self_res, fn_call_count
@@ -820,7 +820,7 @@ void find_all_overscored(
   while (found) {
     res.sort_items();
     
-    results new_res(seq_end - seq_begin, opts.min_score, seq_begin);
+    results new_res(seq_end - seq_begin, opts.min_score, seq_begin, opts.max_len);
     
     find_overscored(
       subject, seq_begin, seq_end, run_re_c, sc, opts, res, new_res, fn_call_count
@@ -993,9 +993,9 @@ void find_pqs_parallel(
     boost::thread::attributes attrs;
     
     // initialize result objects
-    vector<results> res_list(chunk_list.size());
+    vector<results> res_list; //(chunk_list.size());
     for (size_t i = 0; i < chunk_list.size(); ++i) {
-      res_list[i].init(chunk_list[i].e - chunk_list[i].s, opts.min_score, chunk_list[i].s);
+      res_list.emplace_back(chunk_list[i].e - chunk_list[i].s, opts.min_score, chunk_list[i].s, opts.max_len);
     }
     if (num_threads > 1) {
       // run additional threads
@@ -1209,8 +1209,8 @@ SEXP pqsfinder(
   SEXP subject_rc = reverseComplement(subject);
   string seq_rc = as<string>(as_character(subject_rc));
 
-  results res_sense(seq.length(), opts.min_score, seq.begin());
-  results res_antisense(seq_rc.length(), opts.min_score, seq_rc.begin());
+  results res_sense(seq.length(), opts.min_score, seq.begin(), opts.max_len);
+  results res_antisense(seq_rc.length(), opts.min_score, seq_rc.begin(), opts.max_len);
   boost::regex run_re_c(run_re);
 
   if (opts.debug) {
