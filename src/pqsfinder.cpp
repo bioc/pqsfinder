@@ -8,7 +8,7 @@
  * Package: pqsfinder
  */
 
-#define GPERF_ENABLED
+// #define GPERF_ENABLED
 
 #include <Rcpp.h>
 #include <string>
@@ -735,10 +735,12 @@ void find_all_overscored(
 {
   bool found = res.items.size();
   
+  results new_res(seq_end - seq_begin, seq_begin, opts);
+  
   while (found) {
     res.sort_items();
-    
-    results new_res(seq_end - seq_begin, seq_begin, opts);
+    new_res.items.clear();
+    new_res.scores.clear();
     
     find_overscored(
       subject, seq_begin, seq_end, run_re_c, sc, opts, res, new_res, fn_call_count
@@ -751,6 +753,51 @@ void find_all_overscored(
       res.items.push_back(new_res.items[i]);
     }
     found = new_res.items.size();
+  }
+}
+
+void find_all_overscored2(
+    SEXP subject,
+    const string::const_iterator seq_begin,
+    const string::const_iterator seq_end,
+    const boost::regex &run_re_c,
+    const scoring &sc,
+    const opts_t &opts,
+    results &res,
+    int &fn_call_count)
+{
+  results new_res(seq_end - seq_begin, seq_begin, opts);
+  fast_non_overlapping_storage pqs_storage(seq_begin);
+  
+  run_match m[RUN_CNT];
+  int pqs_cnt = 0;
+  string::const_iterator start, end;
+  
+  for (size_t i = 0; i <= res.items.size(); ++i) {
+    if (i == 0) {
+      start = seq_begin;
+    } else {
+      start = res.items[i-1].start + res.items[i-1].len;
+    }
+    if (i == res.items.size()) {
+      end = seq_end;
+    } else {
+      end = res.items[i].start;
+    }
+    find_all_runs(
+      subject, 0, start, end, m, run_re_c, opts, sc, 
+      seq_begin, seq_end - seq_begin, pqs_storage,
+      pqs_cnt, new_res, false, chrono::system_clock::now(),
+      INT_MAX, 0, fn_call_count, false
+    );
+    pqs_storage.export_pqs(new_res);
+    
+    if (new_res.items.size() > 0) {
+      res.items.insert(res.items.begin() + i, new_res.items.begin(), new_res.items.end());
+      --i; // decrement i to continue from newly inserted pqs
+    }
+    new_res.items.clear();
+    new_res.scores.clear();
   }
 }
 
@@ -793,19 +840,8 @@ void find_pqs(
   pqs_storage.export_pqs(res);
   
   if (opts.fast && !res.items.empty()) {
-    find_all_overscored(subject, seq_begin, seq_end, run_re_c, sc, opts, res, fn_call_count);
+    find_all_overscored2(subject, seq_begin, seq_end, run_re_c, sc, opts, res, fn_call_count);
   }
-  
-  // if (opts.fast && !res.items.empty()) {
-  //   size_t prev_count = 0;
-  //   size_t iter_count = 0;
-  //   
-  //   while (prev_count != res.items.size()) {
-  //     ++iter_count;
-  //     prev_count = res.items.size();
-  //     find_all_overscored_pqs(subject, seq_begin, seq_end, run_re_c, sc, opts, res, fn_call_count);
-  //   }
-  // }
 }
 
 

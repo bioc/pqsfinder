@@ -1,6 +1,5 @@
 context("Regressions")
 library(stringi)
-library(stringr)
 
 pqs_max_scores <- function(pv, i) {
   maxScores(pv)[start(pv)[i]:end(pv)[i]]
@@ -209,6 +208,7 @@ test_that("the shortest possible between same-scoring PQS is found", {
 })
 
 test_that("sequences pqs parts can be extracted", {
+  library(stringr)
   test_seq <- DNAString("GGGTAGTGGTTTTGGGTTTGGGAAAAAAAAAAAAAAGGGTTTGGAGGAAATTTGGGGAGGGG")
   pv <- pqsfinder(test_seq, strand = "+")
   pv_m <- elementMetadata(pv)

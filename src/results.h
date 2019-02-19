@@ -97,13 +97,6 @@ public:
   void sort_items() {
     sort(this->items.begin(), this->items.end(), results::compare_by_start);
   }
-  void clear_max_scores() {
-    if (this->max_scores != NULL) {
-      for (size_t i = 0; i < this->seq_len; ++i) {
-        this->max_scores[i] = 0;
-      }
-    }
-  }
   static bool compare_by_start(const results::item_t &a, const results::item_t &b) {
     return a.start < b.start;
   }
