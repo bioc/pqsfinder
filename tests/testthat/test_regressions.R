@@ -90,18 +90,18 @@ test_that("there no overshadowing", {
 })
 
 test_that("maxScores vector is a max of maxScores on sense and antisense", {
-  test_seq <- DNAString(stri_rand_shuffle(strrep("ACCGGT", 1000)))
-  pv <- pqsfinder(test_seq)
-  pv_p <- pqsfinder(test_seq, strand = "+")
-  pv_m <- pqsfinder(test_seq, strand = "-")
+  test_seq <- DNAString(stri_rand_shuffle(strrep("ACCGGT", 500)))
+  pv <- pqsfinder(test_seq, fast = FALSE)
+  pv_p <- pqsfinder(test_seq, strand = "+", fast = FALSE)
+  pv_m <- pqsfinder(test_seq, strand = "-", fast = FALSE)
   expect_equal(maxScores(pv), pmax(maxScores(pv_p), maxScores(pv_m)))
 })
 
 test_that("density vector is a sum of density on sense and antisense", {
-  test_seq <- DNAString(stri_rand_shuffle(strrep("ACCGGT", 1000)))
-  pv <- pqsfinder(test_seq)
-  pv_p <- pqsfinder(test_seq, strand = "+")
-  pv_m <- pqsfinder(test_seq, strand = "-")
+  test_seq <- DNAString(stri_rand_shuffle(strrep("ACCGGT", 500)))
+  pv <- pqsfinder(test_seq, fast = FALSE)
+  pv_p <- pqsfinder(test_seq, strand = "+", fast = FALSE)
+  pv_m <- pqsfinder(test_seq, strand = "-", fast = FALSE)
   expect_equal(density(pv), density(pv_p) + density(pv_m))
 })
 
