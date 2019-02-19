@@ -64,7 +64,7 @@ public:
   }
   inline int get(const string::const_iterator s) {
     int diff = s - this->bstart;
-    if (diff >= 0 && diff < this->max_len) {
+    if (diff < this->max_len) {
       int offset = (this->bstart_offset + diff) % this->max_len;
       return this->buffer[offset];
     } else {
