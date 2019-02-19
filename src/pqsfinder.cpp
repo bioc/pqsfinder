@@ -658,105 +658,18 @@ vector<seq_chunk_t> split_seq_to_chunks(
 }
 
 
+/**
+ * Find overscored pqs
+ * 
+ * @param seq_begin
+ * @param seq_end
+ * @param run_re_c
+ * @param sc
+ * @param opts
+ * @param res
+ * @param fn_call_count
+ */
 void find_overscored(
-    SEXP subject,
-    const string::const_iterator seq_begin,
-    const string::const_iterator seq_end,
-    const boost::regex &run_re_c,
-    const scoring &sc,
-    const opts_t &opts,
-    results &res,
-    results &new_res,
-    int &fn_call_count
-)
-{
-  run_match m[RUN_CNT];
-  int pqs_cnt = 0;
-  string::const_iterator left_start, left_end, right_start, right_end,
-  next_pqs_start, prev_pqs_end, search_start, search_end;
-  
-  fast_non_overlapping_storage pqs_storage(seq_begin);
-  
-  for (size_t i = 0; i < res.items.size(); ++i) {
-    
-    left_end = res.items[i].start;
-    right_start = res.items[i].start + res.items[i].len;
-    
-    if (i == 0) {
-      left_start = seq_begin; //max(left_end - 2*opts.max_len, seq_begin);
-    } else {
-      prev_pqs_end = res.items[i-1].start + res.items[i-1].len;
-      left_start = prev_pqs_end; // max(left_end - opts.max_len, prev_pqs_end);
-      if (left_start - prev_pqs_end < opts.max_len) {
-        left_start = left_end; // do not search again
-      }
-    }
-    if (i == res.items.size() - 1) {
-      right_end = seq_end; //min(right_start + 2*opts.max_len, seq_end);
-    } else {
-      next_pqs_start = res.items[i+1].start;
-      right_end = next_pqs_start; //min(right_start + opts.max_len, next_pqs_start);
-      if (next_pqs_start - right_end < opts.max_len) {
-        right_end = next_pqs_start; // extend search region
-      }
-    }
-    // left side
-    if (left_end - left_start > opts.run_min_len * 4) {
-      find_all_runs(
-        subject, 0, left_start, left_end, m, run_re_c, opts, sc, 
-        seq_begin, seq_end - seq_begin, pqs_storage,
-        pqs_cnt, new_res, false, chrono::system_clock::now(),
-        INT_MAX, 0, fn_call_count, false
-      );
-    }
-    // right side
-    if (right_end - right_start > opts.run_min_len * 4) {
-      find_all_runs(
-        subject, 0, right_start, right_end, m, run_re_c, opts, sc, 
-        seq_begin, seq_end - seq_begin, pqs_storage,
-        pqs_cnt, new_res, false, chrono::system_clock::now(),
-        INT_MAX, 0, fn_call_count, false
-      );
-    }
-  }
-  pqs_storage.export_pqs(new_res);
-}
-
-
-void find_all_overscored(
-    SEXP subject,
-    const string::const_iterator seq_begin,
-    const string::const_iterator seq_end,
-    const boost::regex &run_re_c,
-    const scoring &sc,
-    const opts_t &opts,
-    results &res,
-    int &fn_call_count)
-{
-  bool found = res.items.size();
-  
-  results new_res(seq_end - seq_begin, seq_begin, opts);
-  
-  while (found) {
-    res.sort_items();
-    new_res.items.clear();
-    new_res.scores.clear();
-    
-    find_overscored(
-      subject, seq_begin, seq_end, run_re_c, sc, opts, res, new_res, fn_call_count
-    );
-    
-    Rcout << "Overscored:" << endl;
-    new_res.print();
-    
-    for (size_t i = 0; i < new_res.items.size(); ++i) {
-      res.items.push_back(new_res.items[i]);
-    }
-    found = new_res.items.size();
-  }
-}
-
-void find_all_overscored2(
     SEXP subject,
     const string::const_iterator seq_begin,
     const string::const_iterator seq_end,
@@ -840,7 +753,7 @@ void find_pqs(
   pqs_storage.export_pqs(res);
   
   if (opts.fast && !res.items.empty()) {
-    find_all_overscored2(subject, seq_begin, seq_end, run_re_c, sc, opts, res, fn_call_count);
+    find_overscored(subject, seq_begin, seq_end, run_re_c, sc, opts, res, fn_call_count);
   }
 }
 
