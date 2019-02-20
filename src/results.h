@@ -37,8 +37,8 @@ public:
   };
   vector<results::item_t> items;
   
-  int *density = NULL;
-  int *max_scores = NULL;
+  vector<int> density;
+  vector<int> max_scores;
 
   size_t seq_len = 0;
   string::const_iterator ref;
@@ -49,20 +49,9 @@ public:
     seq_len(seq_len), ref(ref), scores(opts.max_len, ref)
   {
     if (!opts.fast) {
-      this->density = new int[seq_len];
-      this->max_scores = new int[seq_len];
-      
-      for (size_t i = 0; i < seq_len; ++i) {
-        this->density[i] = 0;
-        this->max_scores[i] = 0;
-      }
+      this->density.resize(seq_len, 0);
+      this->max_scores.resize(seq_len, 0);
     }
-  }
-  ~results() {
-    if (this->density != NULL)
-      delete [] this->density;
-    if (this->max_scores != NULL)
-      delete [] this->max_scores;
   }
   inline void save_pqs(
       const int score, const string::const_iterator &s,

@@ -867,10 +867,10 @@ void find_pqs_parallel(
     vector<seq_chunk_t> chunk_list = split_seq_to_chunks(seq, opts);
     
     size_t num_threads = min(chunk_list.size(), opts.threads);
-    std::thread *tt;
+    std::thread *tt = NULL;
     
     // initialize result objects
-    vector<results> res_list; //(chunk_list.size());
+    vector<results> res_list;
     for (size_t i = 0; i < chunk_list.size(); ++i) {
       res_list.emplace_back(chunk_list[i].e - chunk_list[i].s, chunk_list[i].s, opts);
     }
@@ -887,7 +887,7 @@ void find_pqs_parallel(
     // run main thread calculation
     find_pqs_thread(0, num_threads, chunk_list, res_list, subject, run_re_c, sc, opts);
     
-    if (num_threads > 1) {
+    if (tt != NULL) {
       // wait for additional threads
       for (size_t tid = 1; tid < num_threads; ++tid) {
         tt[tid - 1].join();
@@ -950,10 +950,11 @@ void find_pqs_parallel(
 //'   default behavior and specify your own scoring function. By disabling the
 //'   default scoring you will get a full control above the underlying detection
 //'   algorithm.
-//' @param threads Number of threads that can be created by pqsfinder to
-//'   speed up the computation.
 //' @param fast Enable fast searching. This has some impact on maxScores and
 //'   density vectors.
+//' @param threads Number of threads that can be created by pqsfinder to
+//'   speed up the computation.
+//' @param chunk_size Size of thread chunk.
 //' @param verbose Enables detailed output. Turn it on if you want to see all
 //'   possible PQS found at each positions and not just the best one. It is
 //'   highly recommended to use this option for debugging custom quadruplex
@@ -995,6 +996,7 @@ SEXP pqsfinder(
     bool use_default_scoring = true,
     bool fast = true,
     int threads = 1,
+    int chunk_size = 500,
     bool verbose = false)
 {
   if (max_len < 1)
@@ -1048,7 +1050,7 @@ SEXP pqsfinder(
   opts.run_max_len = run_max_len;
   opts.run_min_len = run_min_len;
   opts.threads = threads;
-  opts.chunk_size = 1e5;
+  opts.chunk_size = chunk_size;
   
   if (threads > 1) {
     // disable verbose mode

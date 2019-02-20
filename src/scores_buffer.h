@@ -15,22 +15,14 @@ class scores_buffer {
 private:
   const int max_len;
   const string::const_iterator ref;
-  int *buffer = NULL;
   string::const_iterator bstart;
   int bstart_offset;
+  vector<int> buffer;
   
 public:
   scores_buffer(const int max_len, const string::const_iterator ref):
-    max_len(max_len), ref(ref), bstart(ref), bstart_offset(0)  {
-    
-    this->buffer = new int[max_len];
-    for (int i = 0; i < max_len; ++i) {
-      this->buffer[i] = 0;
-    }
-  }
-  ~scores_buffer() {
-    delete [] this->buffer;
-  }
+    max_len(max_len), ref(ref), bstart(ref), bstart_offset(0), buffer(max_len, 0)  { }
+  
   inline void move_and_set(
       const string::const_iterator s, const string::const_iterator e, const int score)
   {
