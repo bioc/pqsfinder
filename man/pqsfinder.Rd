@@ -13,7 +13,7 @@ pqsfinder(subject, strand = "*", overlapping = FALSE, max_len = 50L,
   loop_mean_factor = 6.6, loop_mean_exponent = 0.8,
   run_re = "G{1,10}.{0,9}G{1,10}", custom_scoring_fn = NULL,
   use_default_scoring = TRUE, fast = TRUE, threads = 1L,
-  verbose = FALSE)
+  chunk_size = 2000L, verbose = FALSE)
 }
 \arguments{
 \item{subject}{DNAString object.}
@@ -85,6 +85,8 @@ density vectors.}
 
 \item{threads}{Number of threads that can be created by pqsfinder to
 speed up the computation.}
+
+\item{chunk_size}{Size of thread chunk.}
 
 \item{verbose}{Enables detailed output. Turn it on if you want to see all
 possible PQS found at each positions and not just the best one. It is

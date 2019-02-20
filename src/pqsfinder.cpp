@@ -661,7 +661,7 @@ vector<seq_chunk_t> split_seq_to_chunks(
       // extend the last chunk to the end of the sequence
       chunk.e = seq.end();
     } else {
-      chunk.e = seq.begin() + (i+1) * opts.chunk_size + opts.max_len;
+      chunk.e = seq.begin() + (i+1) * opts.chunk_size + 2*opts.max_len;
     }
     chunk_list.push_back(chunk);
   }
@@ -775,7 +775,7 @@ void find_pqs(
  * 
  * @param tid
  * @param num_threads
- * @param chunk_list
+ * @param chunk_listpv
  * @param res_list
  * @param subject
  * @param run_re_c
@@ -808,6 +808,8 @@ void find_pqs_thread(
 /**
  * Merge results from different threads
  * 
+ * This seems to be working just for the exact search.
+ * 
  * @param chunk_list
  * @param res_list
  * @param res
@@ -821,111 +823,77 @@ void merge_thread_results(
 {
   string::const_iterator seq_begin = chunk_list[0].s;
   
-  // for (size_t i = 0; i < chunk_list.size(); ++i) {
-  //   // sort chunk results to have them in sequence order
-  //   // res_list[i].sort_items();
-  //   
-  //   string::const_iterator left_limit, right_limit;
-  //   
-  //   if (i == 0) {
-  //     left_limit = chunk_list[i].s;
-  //   } else {
-  //     left_limit = chunk_list[i].s + opts.max_len;
-  //   }
-  //   if (i == chunk_list.size() - 1) {
-  //     right_limit = chunk_list[i].e;
-  //   } else {
-  //     right_limit = chunk_list[i].e - opts.max_len;
-  //   }
-  //   // for (auto & item : res_list[i].items) {
-  //   //   // if (item.start >= left_limit && item.start < right_limit) {
-  //   //     pqs_storage.insert_pqs_item(item, res);
-  //   //   // }
-  //   // }
-  //   if (!opts.fast) {
-  //     int res_offset = left_limit - seq_begin;
-  //     int chunk_offset = left_limit - chunk_list[i].s;
-  //     int write_len = right_limit - left_limit;
-  //     
-  //     for (int k = 0; k < write_len; ++k) {
-  //       res.max_scores[res_offset + k] = res_list[i].max_scores[chunk_offset + k];
-  //       res.density[res_offset + k] = res_list[i].density[chunk_offset + k];
-  //     }
-  //   }
-  // }
-  
-  // if (res_list.size() > 1) {
-  //   Rcout << "Join results from multiple threads." << endl;
-  //   
-  //   for (size_t i = 0; i < res_list.size(); ++i) {
-  //     res_list[i].sort_items();
-  //   }
-  //   overlapping_storage ov_storage(seq_begin);
-  //   revised_non_overlapping_storage nov_storage(seq_begin);
-  //   fast_non_overlapping_storage gnov_storage(seq_begin);
-  //   storage &pqs_storage = select_pqs_storage(opts, ov_storage, nov_storage, gnov_storage);
-  //   
-  //   vector<results>::const_iterator a = res_list.begin();
-  //   vector<results>::const_iterator b = a + 1;
-  //   
-  //   vector<results::item_t>::const_iterator left_it = a->items.begin();
-  //   vector<results::item_t>::const_iterator right_it = b->items.begin();
-  //   
-  //   while (true) {
-  //     if (b - a != 1) {
-  //       Rcout << "b - a = " << b - a << endl;
-  //     }
-  //     if (left_it == a->items.end() && (b + 1) != res_list.end()) {
-  //       // left items are empty and we can still move on next chunk
-  //       a = b;
-  //       b = b + 1;
-  //       left_it = right_it;
-  //       right_it = b->items.begin();
-  //     } else if (right_it == b->items.end()) {
-  //       // move all left items into storage
-  //       while (left_it != a->items.end()) {
-  //         pqs_storage.insert_pqs_item(*left_it, res);
-  //         ++left_it;
-  //       }
-  //       if ((b + 1) == res_list.end()) {
-  //         // nothing to do, break
-  //         break;
-  //       } else if ((b + 2) == res_list.end()) {
-  //         // move all items from the last chunk into storage and break
-  //         b = b + 1;
-  //         right_it = b->items.begin();
-  //         while (right_it != b->items.end()) {
-  //           pqs_storage.insert_pqs_item(*right_it, res);
-  //           ++right_it;
-  //         }
-  //         break;
-  //       } else {
-  //         // move on next two chunks
-  //         a = b + 1;
-  //         b = b + 2;
-  //         left_it = a->items.begin();
-  //         right_it = b->items.begin();
-  //       }
-  //     } else if ((left_it != a->items.end() && right_it == b->items.end()) ||
-  //         (left_it != a->items.end() && right_it != b->items.end() && left_it->start < right_it->start)) {
-  //       pqs_storage.insert_pqs_item(*left_it, res);
-  //       ++left_it;
-  //     } else {
-  //       pqs_storage.insert_pqs_item(*right_it, res);
-  //       ++right_it;
-  //     }
-  //   }
-  //   pqs_storage.export_pqs(res);
-  //   
-  // } else if (res_list.size() == 1) {
-  //   // single results, just copy
-  //   for (size_t i = 0; i < res_list[0].items.size(); ++i) {
-  //     res.items.push_back(res_list[0].items[i]);
-  //   }
-  // }
+  // aggregate max_scores and density vectors
   for (auto res_chunk : res_list) {
-    for (auto item : res_chunk.items) {
-      res.items.push_back(item);
+    size_t offset = res_chunk.ref - seq_begin;
+    
+    for (size_t k = 0; k < res_chunk.seq_len; ++k) {
+      res.max_scores[offset + k] = max(res.max_scores[offset + k], res_chunk.max_scores[k]);
+      res.density[offset + k] = max(res.density[offset + k], res_chunk.density[k]);
+    }
+  }
+  if (res_list.size() > 1) {
+    for (size_t i = 0; i < res_list.size(); ++i) {
+      res_list[i].sort_items();
+    }
+    overlapping_storage ov_storage(seq_begin);
+    revised_non_overlapping_storage nov_storage(seq_begin);
+    fast_non_overlapping_storage gnov_storage(seq_begin);
+    storage &pqs_storage = select_pqs_storage(opts, ov_storage, nov_storage, gnov_storage);
+
+    vector<results>::const_iterator a = res_list.begin();
+    vector<results>::const_iterator b = a + 1;
+
+    vector<results::item_t>::const_iterator left_it = a->items.begin();
+    vector<results::item_t>::const_iterator right_it = b->items.begin();
+
+    while (true) {
+      if (left_it == a->items.end() && (b + 1) != res_list.end()) {
+        // left items are empty and we can still move on next chunk
+        a = b;
+        b = b + 1;
+        left_it = right_it;
+        right_it = b->items.begin();
+      } else if (right_it == b->items.end()) {
+        // move all left items into storage
+        while (left_it != a->items.end()) {
+          pqs_storage.insert_pqs_item(*left_it, res);
+          ++left_it;
+        }
+        if ((b + 1) == res_list.end()) {
+          // nothing to do, break
+          break;
+        } else if ((b + 2) == res_list.end()) {
+          // move all items from the last chunk into storage and break
+          b = b + 1;
+          right_it = b->items.begin();
+          while (right_it != b->items.end()) {
+            pqs_storage.insert_pqs_item(*right_it, res);
+            ++right_it;
+          }
+          break;
+        } else {
+          // move on next two chunks
+          a = b + 1;
+          b = b + 2;
+          left_it = a->items.begin();
+          right_it = b->items.begin();
+        }
+      } else if ((left_it != a->items.end() && right_it == b->items.end()) ||
+          (left_it != a->items.end() && right_it != b->items.end() && left_it->start < right_it->start)) {
+        pqs_storage.insert_pqs_item(*left_it, res);
+        ++left_it;
+      } else {
+        pqs_storage.insert_pqs_item(*right_it, res);
+        ++right_it;
+      }
+    }
+    pqs_storage.export_pqs(res);
+
+  } else if (res_list.size() == 1) {
+    // single results, just copy
+    for (size_t i = 0; i < res_list[0].items.size(); ++i) {
+      res.items.push_back(res_list[0].items[i]);
     }
   }
 }
@@ -949,7 +917,7 @@ void find_pqs_parallel(
     const opts_t &opts,
     results &res)
 {
-  if (false) { //opts.threads == 1) {
+  if (opts.threads == 1 || opts.fast) {
     find_pqs(subject, seq.begin(), seq.end(), run_re_c, sc, opts, res);
   } else {
     vector<seq_chunk_t> chunk_list = split_seq_to_chunks(seq, opts);
@@ -983,7 +951,6 @@ void find_pqs_parallel(
       delete [] tt;
     }
     merge_thread_results(chunk_list, res_list, res, opts);
-    
   }
 }
 
@@ -1085,7 +1052,7 @@ SEXP pqsfinder(
     bool use_default_scoring = true,
     bool fast = true,
     int threads = 1,
-    int chunk_size = 500,
+    int chunk_size = 2000,
     bool verbose = false)
 {
   if (max_len < 1)
