@@ -642,26 +642,27 @@ vector<seq_chunk_t> split_seq_to_chunks(
   vector<seq_chunk_t> chunk_list;
   
   const size_t seq_len = seq.length();
-  const size_t chunk_count = seq_len / opts.chunk_size;
+  int chunk_count;
   seq_chunk_t chunk;
   
-  for (size_t i = 0; i < chunk_count; ++i) {
+  if (opts.chunk_size > seq_len) {
+    chunk_count = 1;
+  } else {
+    chunk_count = seq_len / opts.chunk_size;
+  }
+  
+  for (int i = 0; i < chunk_count; ++i) {
     if (i == 0) {
       chunk.s = seq.begin();
     } else {
-      chunk.s = seq.begin() + i * opts.chunk_size - 2*opts.max_len;
+      chunk.s = seq.begin() + i * opts.chunk_size;
     }
     if (i == chunk_count - 1) {
       // extend the last chunk to the end of the sequence
       chunk.e = seq.end();
     } else {
-      chunk.e = seq.begin() + (i+1) * opts.chunk_size + 2*opts.max_len;
+      chunk.e = seq.begin() + (i+1) * opts.chunk_size + opts.max_len;
     }
-    chunk_list.push_back(chunk);
-  }
-  if (chunk_count == 0) {
-    chunk.s = seq.begin();
-    chunk.e = seq.end();
     chunk_list.push_back(chunk);
   }
   return chunk_list;
@@ -721,6 +722,7 @@ void find_overscored(
     }
     new_res.items.clear();
     new_res.scores.clear();
+    pqs_storage.reset(seq_begin);
   }
 }
 
@@ -805,41 +807,127 @@ void find_pqs_thread(
 
 /**
  * Merge results from different threads
- * TODO: This is probably wrong, because PQS does not go to storage in sequence order
  * 
- * @param seq_begin
+ * @param chunk_list
  * @param res_list
  * @param res
  * @param opts
  */
-void merge_results(
-    const string::const_iterator seq_begin,
+void merge_thread_results(
+    vector<seq_chunk_t> chunk_list,
     vector<results> &res_list,
     results &res,
     const opts_t &opts)
 {
-  overlapping_storage ov_storage(seq_begin);
-  revised_non_overlapping_storage nov_storage(seq_begin);
-  fast_non_overlapping_storage gnov_storage(seq_begin);
-  storage &pqs_storage = select_pqs_storage(opts, ov_storage, nov_storage, gnov_storage);
+  string::const_iterator seq_begin = chunk_list[0].s;
   
-  for (size_t i = 0; i < res_list.size(); ++i) {
-    // sort partial results to have them in sequence order
-    res_list[i].sort_items();
-    
-    size_t offset = res_list[i].ref - seq_begin;
-    
-    if (!opts.fast) {
-      for (size_t k = 0; k < res_list[i].seq_len; ++k) {
-        res.max_scores[offset + k] = max(res.max_scores[offset + k], res_list[i].max_scores[k]);
-        res.density[offset + k] = max(res.density[offset + k], res_list[i].density[k]);
-      }
-    }
-    for (size_t k = 0; k < res_list[i].items.size(); ++k) {
-      pqs_storage.insert_pqs_item(res_list[i].items[k], res);
+  // for (size_t i = 0; i < chunk_list.size(); ++i) {
+  //   // sort chunk results to have them in sequence order
+  //   // res_list[i].sort_items();
+  //   
+  //   string::const_iterator left_limit, right_limit;
+  //   
+  //   if (i == 0) {
+  //     left_limit = chunk_list[i].s;
+  //   } else {
+  //     left_limit = chunk_list[i].s + opts.max_len;
+  //   }
+  //   if (i == chunk_list.size() - 1) {
+  //     right_limit = chunk_list[i].e;
+  //   } else {
+  //     right_limit = chunk_list[i].e - opts.max_len;
+  //   }
+  //   // for (auto & item : res_list[i].items) {
+  //   //   // if (item.start >= left_limit && item.start < right_limit) {
+  //   //     pqs_storage.insert_pqs_item(item, res);
+  //   //   // }
+  //   // }
+  //   if (!opts.fast) {
+  //     int res_offset = left_limit - seq_begin;
+  //     int chunk_offset = left_limit - chunk_list[i].s;
+  //     int write_len = right_limit - left_limit;
+  //     
+  //     for (int k = 0; k < write_len; ++k) {
+  //       res.max_scores[res_offset + k] = res_list[i].max_scores[chunk_offset + k];
+  //       res.density[res_offset + k] = res_list[i].density[chunk_offset + k];
+  //     }
+  //   }
+  // }
+  
+  // if (res_list.size() > 1) {
+  //   Rcout << "Join results from multiple threads." << endl;
+  //   
+  //   for (size_t i = 0; i < res_list.size(); ++i) {
+  //     res_list[i].sort_items();
+  //   }
+  //   overlapping_storage ov_storage(seq_begin);
+  //   revised_non_overlapping_storage nov_storage(seq_begin);
+  //   fast_non_overlapping_storage gnov_storage(seq_begin);
+  //   storage &pqs_storage = select_pqs_storage(opts, ov_storage, nov_storage, gnov_storage);
+  //   
+  //   vector<results>::const_iterator a = res_list.begin();
+  //   vector<results>::const_iterator b = a + 1;
+  //   
+  //   vector<results::item_t>::const_iterator left_it = a->items.begin();
+  //   vector<results::item_t>::const_iterator right_it = b->items.begin();
+  //   
+  //   while (true) {
+  //     if (b - a != 1) {
+  //       Rcout << "b - a = " << b - a << endl;
+  //     }
+  //     if (left_it == a->items.end() && (b + 1) != res_list.end()) {
+  //       // left items are empty and we can still move on next chunk
+  //       a = b;
+  //       b = b + 1;
+  //       left_it = right_it;
+  //       right_it = b->items.begin();
+  //     } else if (right_it == b->items.end()) {
+  //       // move all left items into storage
+  //       while (left_it != a->items.end()) {
+  //         pqs_storage.insert_pqs_item(*left_it, res);
+  //         ++left_it;
+  //       }
+  //       if ((b + 1) == res_list.end()) {
+  //         // nothing to do, break
+  //         break;
+  //       } else if ((b + 2) == res_list.end()) {
+  //         // move all items from the last chunk into storage and break
+  //         b = b + 1;
+  //         right_it = b->items.begin();
+  //         while (right_it != b->items.end()) {
+  //           pqs_storage.insert_pqs_item(*right_it, res);
+  //           ++right_it;
+  //         }
+  //         break;
+  //       } else {
+  //         // move on next two chunks
+  //         a = b + 1;
+  //         b = b + 2;
+  //         left_it = a->items.begin();
+  //         right_it = b->items.begin();
+  //       }
+  //     } else if ((left_it != a->items.end() && right_it == b->items.end()) ||
+  //         (left_it != a->items.end() && right_it != b->items.end() && left_it->start < right_it->start)) {
+  //       pqs_storage.insert_pqs_item(*left_it, res);
+  //       ++left_it;
+  //     } else {
+  //       pqs_storage.insert_pqs_item(*right_it, res);
+  //       ++right_it;
+  //     }
+  //   }
+  //   pqs_storage.export_pqs(res);
+  //   
+  // } else if (res_list.size() == 1) {
+  //   // single results, just copy
+  //   for (size_t i = 0; i < res_list[0].items.size(); ++i) {
+  //     res.items.push_back(res_list[0].items[i]);
+  //   }
+  // }
+  for (auto res_chunk : res_list) {
+    for (auto item : res_chunk.items) {
+      res.items.push_back(item);
     }
   }
-  pqs_storage.export_pqs(res);
 }
 
 
@@ -861,7 +949,7 @@ void find_pqs_parallel(
     const opts_t &opts,
     results &res)
 {
-  if (opts.threads == 1) {
+  if (false) { //opts.threads == 1) {
     find_pqs(subject, seq.begin(), seq.end(), run_re_c, sc, opts, res);
   } else {
     vector<seq_chunk_t> chunk_list = split_seq_to_chunks(seq, opts);
@@ -894,7 +982,8 @@ void find_pqs_parallel(
       }
       delete [] tt;
     }
-    merge_results(seq.begin(), res_list, res, opts);
+    merge_thread_results(chunk_list, res_list, res, opts);
+    
   }
 }
 

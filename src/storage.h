@@ -236,17 +236,23 @@ public:
 
 class fast_non_overlapping_storage: public storage {
 private:
-  string::const_iterator best_s, best_e;
+  string::const_iterator best_s, best_e, last_s;
   features_t best_f;
   int best_score = 0;
   
 public:
-  fast_non_overlapping_storage(string::const_iterator start) : best_e(start) {}
+  fast_non_overlapping_storage(string::const_iterator start) :
+    best_s(start), best_e(start), last_s(start) {}
   
   virtual void insert_pqs(
       int score, string::const_iterator s, string::const_iterator e, features_t &f,
       results &res)
   {
+    if (s < this->last_s) {
+      Rcout << "Out-of-order insertion into fast non-overlapping storage: " << s - this->last_s << endl;
+      return;
+    }
+    this->last_s = s;
     if (s >= this->best_e && this->best_score > 0)
     {// export PQS because no further overlapping pqs can be found
       this->export_pqs(res);
@@ -286,6 +292,12 @@ public:
       res.save_pqs(this->best_score, this->best_s, this->best_e, this->best_f);
       this->best_score = 0;
     }
+  }
+  void reset(string::const_iterator start) {
+    this->best_s = start;
+    this->best_e = start;
+    this->last_s = start;
+    this->best_score = 0;
   }
 };
 
