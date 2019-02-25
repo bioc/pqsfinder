@@ -510,7 +510,7 @@ void find_all_runs(
   
   /* Check user interrupt after reasonable amount of runs matched
    * on important user signals. E.g. the user might want to abort the computation. */
-  if (opts.threads == 1 && int_cnt > opts.check_int_period)
+  if (int_cnt > opts.check_int_period)
   {
     int_cnt = 0;
     checkUserInterrupt();
@@ -780,11 +780,9 @@ void find_pqs(
 //'   default behavior and specify your own scoring function. By disabling the
 //'   default scoring you will get a full control above the underlying detection
 //'   algorithm.
-//' @param fast Enable fast searching. This has some impact on maxScores and
-//'   density vectors.
-//' @param threads Number of threads that can be created by pqsfinder to
-//'   speed up the computation.
-//' @param chunk_size Size of thread chunk.
+//' @param deep Perform deep search. With this option enabled,
+//'   \code{\link{maxScores}} and \code{\link{density}}
+//'   vectors are computed. Deep search is much more computationaly demanding.
 //' @param verbose Enables detailed output. Turn it on if you want to see all
 //'   possible PQS found at each positions and not just the best one. It is
 //'   highly recommended to use this option for debugging custom quadruplex
@@ -824,9 +822,7 @@ SEXP pqsfinder(
     std::string run_re = "G{1,10}.{0,9}G{1,10}",
     SEXP custom_scoring_fn = R_NilValue,
     bool use_default_scoring = true,
-    bool fast = true,
-    int threads = 1,
-    int chunk_size = 2000,
+    bool deep = false,
     bool verbose = false)
 {
   if (max_len < 1)
@@ -871,7 +867,7 @@ SEXP pqsfinder(
   opts.debug = false;
   opts.verbose = verbose;
   opts.use_default_scoring = use_default_scoring;
-  opts.fast = fast;
+  opts.fast = !deep;
   opts.overlapping = overlapping;
   opts.max_len = max_len;
   opts.min_score = min_score;
@@ -879,13 +875,7 @@ SEXP pqsfinder(
   opts.loop_min_len = loop_min_len;
   opts.run_max_len = run_max_len;
   opts.run_min_len = run_min_len;
-  opts.threads = threads;
-  opts.chunk_size = chunk_size;
   
-  if (threads > 1) {
-    // disable verbose mode
-    opts.verbose = false;
-  }
   if (run_re != "G{1,10}.{0,9}G{1,10}") {
     // User specified its own regexp, force to use regexp engine
     opts.use_re = true;

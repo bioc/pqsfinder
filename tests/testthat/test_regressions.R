@@ -41,9 +41,9 @@ test_that("the result on test seq is the same as gives pqsfinder-1.4.4-patched",
   load("pqsfinder_1_4_4_patched.RData")
   
   cat(" run default pqsfinder\n")
-  pv_d <- pqsfinder(test_seq, strand = "+", fast = TRUE)
+  pv_d <- pqsfinder(test_seq, strand = "+", deep = FALSE)
   cat(" run pqsfinder using boost regex engine\n")
-  pv_r <- pqsfinder(test_seq, strand = "+", run_re = "G{1,10}.{0,10}G{1,10}", fast = TRUE)
+  pv_r <- pqsfinder(test_seq, strand = "+", run_re = "G{1,10}.{0,10}G{1,10}", deep = FALSE)
   
   cat(" compare pv_d, pv_r\n")
   expect_no_overlaps(pv_d)
@@ -61,8 +61,8 @@ test_that("the result on test seq is the same as gives pqsfinder-1.4.4-patched",
 test_that("fast computation give same pqs as original slow one on real test_seq", {
   load("pqsfinder_1_4_4_patched.RData")
   
-  pv_fast <- pqsfinder(test_seq, fast = TRUE)
-  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  pv_fast <- pqsfinder(test_seq, deep = FALSE)
+  pv_slow <- pqsfinder(test_seq, deep = TRUE)
   
   pv_fast_p <- pv_fast[strand(pv_fast) == "+"]
   pv_fast_m <- pv_fast[strand(pv_fast) == "-"]
@@ -84,32 +84,32 @@ test_that("fast computation give same pqs as original slow one on real test_seq"
 test_that("there no overshadowing", {
   test_seq <- DNAString("GGGCATGGCCCACCAGGAGGGTGGCTCGGGTGGGGGACAAGCTGGTAGGCAGGGCCAAGGAGCTGAGAGGCTACACGGGAGGGAGCTGACCCACAGGACCAGGACAGGGGGCTTGGAGGAGGCGAGCAGAGGAGCTGGGG")
   
-  pv_fast <- pqsfinder(test_seq, fast = TRUE)
-  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  pv_fast <- pqsfinder(test_seq, deep = FALSE)
+  pv_slow <- pqsfinder(test_seq, deep = TRUE)
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
 
 test_that("maxScores vector is a max of maxScores on sense and antisense", {
   test_seq <- DNAString(stri_rand_shuffle(strrep("ACCGGT", 500)))
-  pv <- pqsfinder(test_seq, fast = FALSE)
-  pv_p <- pqsfinder(test_seq, strand = "+", fast = FALSE)
-  pv_m <- pqsfinder(test_seq, strand = "-", fast = FALSE)
+  pv <- pqsfinder(test_seq, deep = TRUE)
+  pv_p <- pqsfinder(test_seq, strand = "+", deep = TRUE)
+  pv_m <- pqsfinder(test_seq, strand = "-", deep = TRUE)
   expect_equal(maxScores(pv), pmax(maxScores(pv_p), maxScores(pv_m)))
 })
 
 test_that("density vector is a sum of density on sense and antisense", {
   test_seq <- DNAString(stri_rand_shuffle(strrep("ACCGGT", 500)))
-  pv <- pqsfinder(test_seq, fast = FALSE)
-  pv_p <- pqsfinder(test_seq, strand = "+", fast = FALSE)
-  pv_m <- pqsfinder(test_seq, strand = "-", fast = FALSE)
+  pv <- pqsfinder(test_seq, deep = TRUE)
+  pv_p <- pqsfinder(test_seq, strand = "+", deep = TRUE)
+  pv_m <- pqsfinder(test_seq, strand = "-", deep = TRUE)
   expect_equal(density(pv), density(pv_p) + density(pv_m))
 })
 
 test_that("results are the same for slow and fast computation on random string", {
   test_seq <- DNAString(stri_rand_shuffle(strrep("ACGGGT", 1000)))
   
-  system.time(pv_fast <- pqsfinder(test_seq, fast = TRUE))
-  system.time(pv_slow <- pqsfinder(test_seq, fast = FALSE))
+  system.time(pv_fast <- pqsfinder(test_seq, deep = FALSE))
+  system.time(pv_slow <- pqsfinder(test_seq, deep = TRUE))
   
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
@@ -117,8 +117,8 @@ test_that("results are the same for slow and fast computation on random string",
 test_that("results are correct on buggy seq1", {
   test_seq <- DNAString("GGGGGGGCAGCCGGCTCGTTTCGGAGAGCGGGCCGGGCAAGGGTGAACACACAGCGGGC")
   
-  pv_fast <- pqsfinder(test_seq, fast = TRUE)
-  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  pv_fast <- pqsfinder(test_seq, deep = FALSE)
+  pv_slow <- pqsfinder(test_seq, deep = TRUE)
   
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
@@ -126,8 +126,8 @@ test_that("results are correct on buggy seq1", {
 test_that("results are correct on buggy seq2", {
   test_seq <- DNAString("GGGGTGCCCTAGGGGAGGGGGTGGGGAGGGACCGCCGGGCGACGGAGGGGTCGGTGCTTAGGACTGTCGGGGCGAAACGGCAGCGG")
   
-  pv_fast <- pqsfinder(test_seq, fast = TRUE)
-  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  pv_fast <- pqsfinder(test_seq, deep = FALSE)
+  pv_slow <- pqsfinder(test_seq, deep = TRUE)
   
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
@@ -135,8 +135,8 @@ test_that("results are correct on buggy seq2", {
 test_that("results are correct on buggy seq3", {
   test_seq <- DNAString("GTACTGGGCCGGGGGCGGGCGGTGGCTGGCTAGCTGGGGGGGGGAGGCGCCGGTCAACGGGGGGCCAAGGAGGAGGG")
   
-  pv_fast <- pqsfinder(test_seq, fast = TRUE)
-  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  pv_fast <- pqsfinder(test_seq, deep = FALSE)
+  pv_slow <- pqsfinder(test_seq, deep = TRUE)
   
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
@@ -144,8 +144,8 @@ test_that("results are correct on buggy seq3", {
 test_that("results are correct on buggy seq4", {
   test_seq <- DNAString("GGCTAGCGGGTGGAGGGCTCGAGATGCGGAGTGTTGGTAGGTGGGAGAGCCTTAGATACGGGTAACGAGGGGTCGCGCGGCAGTGTTGAGACTTGTGGGCAGCGTGGTAGGGGCGCGGGCGAAGGGGGGCTGGGCGGGTGTCGGGGAAGGAGGGGGCG")
   
-  pv_fast <- pqsfinder(test_seq, fast = TRUE)
-  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  pv_fast <- pqsfinder(test_seq, deep = FALSE)
+  pv_slow <- pqsfinder(test_seq, deep = TRUE)
   
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
@@ -153,8 +153,8 @@ test_that("results are correct on buggy seq4", {
 test_that("results are correct on buggy seq5", {
   test_seq <- DNAString("ATGAGTGGGGCGTTTGCGGGTGCGGGAAGATGGGAGGCGCATTCGGGACAGGAGGGGGACATTTCGGAACGTGAGGGCCGGGGGTGTAAGGGGACAGGGGGTGAGGGCGGGGAGGGGCTTGGTTCGAGTATCGTTGGGGGGTCGGCTGGGGCAGGAGCGATGGGGCGAACTCGTGGGCGGGCTTAGGTGCGAGGTGGATACGTCGAAGCTAGACGTAGGGGGACAGCGCGGGGGGGAGCGATAATGTTCTG")
   
-  pv_fast <- pqsfinder(test_seq, fast = TRUE)
-  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  pv_fast <- pqsfinder(test_seq, deep = FALSE)
+  pv_slow <- pqsfinder(test_seq, deep = TRUE)
   
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
@@ -162,8 +162,8 @@ test_that("results are correct on buggy seq5", {
 test_that("results are correct on buggy seq6", {
   test_seq <- DNAString("GGATTGGGGGACCGGGGGTTGGTGGGGTGGATACTGGGGGGGGGGGGCAGTTCTCAGTTAAAGTGCGGTGCCGGAGGGCGACGGGGTGAATATGTAGACAGGGGGCGCCGGGGGGGGCATTGTGGGGCAGAATAGGGATGGGTATGATGTCGGGCG")
   
-  pv_fast <- pqsfinder(test_seq, fast = TRUE)
-  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  pv_fast <- pqsfinder(test_seq, deep = FALSE)
+  pv_slow <- pqsfinder(test_seq, deep = TRUE)
   
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
@@ -171,8 +171,8 @@ test_that("results are correct on buggy seq6", {
 test_that("results are correct on buggy seq7", {
   test_seq <- DNAString("GGGGCGAGGCAGAGGTGGGCAAGGACAAGGGGCAGGCAGGAATTAAGAGTGAGAATGCGGCTGCAGCCAGGAAGTGAGGTCTGCGCGCAGCCAGGGACTGGAGCACTCCATCAGGCGAGCTGGAGAGAAGGGGGCTTGGAACCAGGATTCGGGAGGAGGAGCTGCTGCCAGGGCTGACAGGGTCAAGGGCATGGCCCACCAGGAGGGTGGCTCGGGTGGGGGACAAGCTGGTAGGCAG")
   
-  pv_fast <- pqsfinder(test_seq, fast = TRUE)
-  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  pv_fast <- pqsfinder(test_seq, deep = FALSE)
+  pv_slow <- pqsfinder(test_seq, deep = TRUE)
   
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
@@ -180,8 +180,8 @@ test_that("results are correct on buggy seq7", {
 test_that("results are correct on buggy seq8", {
   test_seq <- DNAString("GGGCCAAGGAGCTGAGAGGCTACACGGGAGGGAGCTGACCCACAGGACCAGGACAGGGGGCTTGGAGGAGGCGAGCAGAGGAGCTGGGGCTTTGCACAGGGTGAGGAGAGAGGGCTCGACCATATGGGAAAGGGAGGAACCACCCATGGG")
   
-  pv_fast <- pqsfinder(test_seq, fast = TRUE)
-  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  pv_fast <- pqsfinder(test_seq, deep = FALSE)
+  pv_slow <- pqsfinder(test_seq, deep = TRUE)
   
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
@@ -189,8 +189,8 @@ test_that("results are correct on buggy seq8", {
 test_that("results are correct on buggy seq9", {
   test_seq <- DNAString("GGGTACAGGGTGTGCTAGGGGGGCGGGGGTGCTCGGGGAGTTGGGTTGAGAAGTGAGTGGGGGATGGGTCACTGGCGGGGCGGGGTAGGGGGGG")
   
-  pv_fast <- pqsfinder(test_seq, fast = TRUE)
-  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  pv_fast <- pqsfinder(test_seq, deep = FALSE)
+  pv_slow <- pqsfinder(test_seq, deep = TRUE)
   
   expect_equal_pv_coords(pv_fast, pv_slow)
 })
@@ -198,8 +198,8 @@ test_that("results are correct on buggy seq9", {
 test_that("the shortest possible between same-scoring PQS is found", {
   test_seq <- DNAString("GGGGCCTGTCAGGGGGTCGGGGAAGGGGGGGCTAGGGGAG")
   
-  pv_fast <- pqsfinder(test_seq, fast = TRUE)
-  pv_slow <- pqsfinder(test_seq, fast = FALSE)
+  pv_fast <- pqsfinder(test_seq, deep = FALSE)
+  pv_slow <- pqsfinder(test_seq, deep = TRUE)
   
   expect_equal(width(pv_fast), 29)
   expect_equal(width(pv_slow), 29)

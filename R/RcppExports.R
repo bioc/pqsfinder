@@ -52,11 +52,9 @@
 #'   default behavior and specify your own scoring function. By disabling the
 #'   default scoring you will get a full control above the underlying detection
 #'   algorithm.
-#' @param fast Enable fast searching. This has some impact on maxScores and
-#'   density vectors.
-#' @param threads Number of threads that can be created by pqsfinder to
-#'   speed up the computation.
-#' @param chunk_size Size of thread chunk.
+#' @param deep Perform deep search. With this option enabled,
+#'   \code{\link{maxScores}} and \code{\link{density}}
+#'   vectors are computed. Deep search is much more computationaly demanding.
 #' @param verbose Enables detailed output. Turn it on if you want to see all
 #'   possible PQS found at each positions and not just the best one. It is
 #'   highly recommended to use this option for debugging custom quadruplex
@@ -72,7 +70,7 @@
 #' pv
 #' elementMetadata(pv)
 #'
-pqsfinder <- function(subject, strand = "*", overlapping = FALSE, max_len = 50L, min_score = 26L, run_min_len = 2L, run_max_len = 11L, loop_min_len = 0L, loop_max_len = 30L, max_bulges = 3L, max_mismatches = 3L, max_defects = 3L, tetrad_bonus = 40L, mismatch_penalty = 28L, bulge_penalty = 20L, bulge_len_factor = 0.2, bulge_len_exponent = 1, loop_mean_factor = 6.6, loop_mean_exponent = 0.8, run_re = "G{1,10}.{0,9}G{1,10}", custom_scoring_fn = NULL, use_default_scoring = TRUE, fast = TRUE, threads = 1L, chunk_size = 2000L, verbose = FALSE) {
-    .Call('_pqsfinder_pqsfinder', PACKAGE = 'pqsfinder', subject, strand, overlapping, max_len, min_score, run_min_len, run_max_len, loop_min_len, loop_max_len, max_bulges, max_mismatches, max_defects, tetrad_bonus, mismatch_penalty, bulge_penalty, bulge_len_factor, bulge_len_exponent, loop_mean_factor, loop_mean_exponent, run_re, custom_scoring_fn, use_default_scoring, fast, threads, chunk_size, verbose)
+pqsfinder <- function(subject, strand = "*", overlapping = FALSE, max_len = 50L, min_score = 26L, run_min_len = 2L, run_max_len = 11L, loop_min_len = 0L, loop_max_len = 30L, max_bulges = 3L, max_mismatches = 3L, max_defects = 3L, tetrad_bonus = 40L, mismatch_penalty = 28L, bulge_penalty = 20L, bulge_len_factor = 0.2, bulge_len_exponent = 1, loop_mean_factor = 6.6, loop_mean_exponent = 0.8, run_re = "G{1,10}.{0,9}G{1,10}", custom_scoring_fn = NULL, use_default_scoring = TRUE, deep = FALSE, verbose = FALSE) {
+    .Call('_pqsfinder_pqsfinder', PACKAGE = 'pqsfinder', subject, strand, overlapping, max_len, min_score, run_min_len, run_max_len, loop_min_len, loop_max_len, max_bulges, max_mismatches, max_defects, tetrad_bonus, mismatch_penalty, bulge_penalty, bulge_len_factor, bulge_len_exponent, loop_mean_factor, loop_mean_exponent, run_re, custom_scoring_fn, use_default_scoring, deep, verbose)
 }
 

@@ -19,8 +19,6 @@ struct opts_t {
   int loop_min_len;
   int loop_max_len;
   int check_int_period;
-  size_t threads;
-  size_t chunk_size;
   bool verbose;
   bool overlapping;
   bool use_re;
