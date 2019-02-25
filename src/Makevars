@@ -6,16 +6,16 @@ ifneq (,)
 This makefile requires GNU Make.
 endif
 
-BOOSTSRC=${wildcard boost_regex/*.cpp}
-BOOSTOBJS=${BOOSTSRC:.cpp=.o}
+bregex_src=${wildcard boost_regex/*.cpp}
+bregex_objs=${bregex_src:.cpp=.o}
 
-BOOSTLIB = libboost.a
+REGEXLIB = libboost_regex.a
 USERDIR = ${R_PACKAGE_DIR}/lib${R_ARCH}
-USERLIB = ${USERDIR}/${BOOSTLIB}
+USERLIB = ${USERDIR}/${REGEXLIB}
 
 CXX_STD = CXX11
-PKG_LIBS = "${USERLIB}" #-lprofiler
-# put CXX11FLAGS += -O0... into ~/.R/Makevars to override default gcc flags
+PKG_LIBS = "${USERLIB}"
+
 
 .PHONY: all clean 
 
@@ -23,9 +23,9 @@ all: $(SHLIB)
 
 $(SHLIB): $(USERLIB)
 
-$(USERLIB): ${BOOSTOBJS}
+$(USERLIB): ${bregex_objs}
 	mkdir -p "${USERDIR}"
-	$(AR) rs "${USERLIB}" ${BOOSTOBJS}
+	$(AR) rs "${USERLIB}" ${bregex_objs}
 
 clean:
-	rm -f $(BOOSTOBJS) $(SHLIB)
+	rm -f $(OBJECTS) $(SHLIB)
