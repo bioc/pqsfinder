@@ -44,11 +44,6 @@ using namespace std;
  * __do not include__ the element pointed by their closing iterator.
  */
 
-/*
- * TODO: Avoid using unsigned int (size_t)
- */
-
-
 
 // search progress description
 struct search_progress_t {
@@ -56,13 +51,6 @@ struct search_progress_t {
   int minutes;
   int hours;
   double percents;
-};
-
-
-// sequence chunk
-struct seq_chunk_t {
-  string::const_iterator s;
-  string::const_iterator e;
 };
 
 
