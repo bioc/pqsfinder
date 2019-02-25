@@ -565,14 +565,13 @@ void find_all_runs(
           - next_defect_count * min(sc.bulge_penalty, sc.mismatch_penalty)
           - sc.loop_penalties[next_loop_sum];
         
-        if (opts.verbose) {
-          print_partial_pqs(m, i, ref);
-          Rcout << "next_tetrad_count: " << next_tetrad_count 
-                << " next_defect_count: " << next_defect_count
-                << " max_scores[0]: " << res.scores.get(m[0].first)
-                << " max_score: " << max_score
-                << endl;
-        }
+        // print_partial_pqs(m, i, ref);
+        // Rcout << "next_tetrad_count: " << next_tetrad_count 
+        //       << " next_defect_count: " << next_defect_count
+        //       << " max_scores[0]: " << res.scores.get(m[0].first)
+        //       << " max_score: " << max_score
+        //       << endl;
+        
         if ((max_score < res.scores.get(m[0].first) || max_score < opts.min_score)) {
           // comparison to min_score helps quite a lot (2-3x speedup for default min_score)
           continue;
@@ -626,46 +625,6 @@ void find_all_runs(
       break;
     }
   }
-}
-
-
-/**
- * Split sequence into individual chunks with sufficient overlap
- * 
- * @param seq DNA sequence
- * @param opts Algorithm options
- */
-vector<seq_chunk_t> split_seq_to_chunks(
-    const string &seq,
-    const opts_t &opts) 
-{
-  vector<seq_chunk_t> chunk_list;
-  
-  const size_t seq_len = seq.length();
-  int chunk_count;
-  seq_chunk_t chunk;
-  
-  if (opts.chunk_size > seq_len) {
-    chunk_count = 1;
-  } else {
-    chunk_count = seq_len / opts.chunk_size;
-  }
-  
-  for (int i = 0; i < chunk_count; ++i) {
-    if (i == 0) {
-      chunk.s = seq.begin();
-    } else {
-      chunk.s = seq.begin() + i * opts.chunk_size;
-    }
-    if (i == chunk_count - 1) {
-      // extend the last chunk to the end of the sequence
-      chunk.e = seq.end();
-    } else {
-      chunk.e = seq.begin() + (i+1) * opts.chunk_size + 2*opts.max_len;
-    }
-    chunk_list.push_back(chunk);
-  }
-  return chunk_list;
 }
 
 
@@ -766,191 +725,6 @@ void find_pqs(
   
   if (opts.fast && !res.items.empty()) {
     find_overscored(subject, seq_begin, seq_end, run_re_c, sc, opts, res, fn_call_count);
-  }
-}
-
-
-/**
- * Single thread payload
- * 
- * @param tid
- * @param num_threads
- * @param chunk_listpv
- * @param res_list
- * @param subject
- * @param run_re_c
- * @param sc
- * @param opts
- */
-void find_pqs_thread(
-    int tid,
-    int num_threads,
-    vector<seq_chunk_t> &chunk_list,
-    vector<results> &res_list,
-    SEXP subject,
-    const boost::regex &run_re_c,
-    const scoring &sc,
-    const opts_t &opts)
-{
-  for (size_t i = tid; i < chunk_list.size(); i += num_threads) {
-    find_pqs(
-      subject,
-      chunk_list[i].s,
-      chunk_list[i].e,
-      run_re_c,
-      sc,
-      opts,
-      res_list[i]);
-  }
-}
-
-
-/**
- * Merge results from different threads
- * 
- * This seems to be working just for the exact search.
- * 
- * @param chunk_list
- * @param res_list
- * @param res
- * @param opts
- */
-void merge_thread_results(
-    vector<seq_chunk_t> chunk_list,
-    vector<results> &res_list,
-    results &res,
-    const opts_t &opts)
-{
-  string::const_iterator seq_begin = chunk_list[0].s;
-  
-  // aggregate max_scores and density vectors
-  for (auto res_chunk : res_list) {
-    size_t offset = res_chunk.ref - seq_begin;
-    
-    for (size_t k = 0; k < res_chunk.seq_len; ++k) {
-      res.max_scores[offset + k] = max(res.max_scores[offset + k], res_chunk.max_scores[k]);
-      res.density[offset + k] = max(res.density[offset + k], res_chunk.density[k]);
-    }
-  }
-  if (res_list.size() > 1) {
-    for (size_t i = 0; i < res_list.size(); ++i) {
-      res_list[i].sort_items();
-    }
-    overlapping_storage ov_storage(seq_begin);
-    revised_non_overlapping_storage nov_storage(seq_begin);
-    fast_non_overlapping_storage gnov_storage(seq_begin);
-    storage &pqs_storage = select_pqs_storage(opts, ov_storage, nov_storage, gnov_storage);
-
-    vector<results>::const_iterator a = res_list.begin();
-    vector<results>::const_iterator b = a + 1;
-
-    vector<results::item_t>::const_iterator left_it = a->items.begin();
-    vector<results::item_t>::const_iterator right_it = b->items.begin();
-
-    while (true) {
-      if (left_it == a->items.end() && (b + 1) != res_list.end()) {
-        // left items are empty and we can still move on next chunk
-        a = b;
-        b = b + 1;
-        left_it = right_it;
-        right_it = b->items.begin();
-      } else if (right_it == b->items.end()) {
-        // move all left items into storage
-        while (left_it != a->items.end()) {
-          pqs_storage.insert_pqs_item(*left_it, res);
-          ++left_it;
-        }
-        if ((b + 1) == res_list.end()) {
-          // nothing to do, break
-          break;
-        } else if ((b + 2) == res_list.end()) {
-          // move all items from the last chunk into storage and break
-          b = b + 1;
-          right_it = b->items.begin();
-          while (right_it != b->items.end()) {
-            pqs_storage.insert_pqs_item(*right_it, res);
-            ++right_it;
-          }
-          break;
-        } else {
-          // move on next two chunks
-          a = b + 1;
-          b = b + 2;
-          left_it = a->items.begin();
-          right_it = b->items.begin();
-        }
-      } else if ((left_it != a->items.end() && right_it == b->items.end()) ||
-          (left_it != a->items.end() && right_it != b->items.end() && left_it->start < right_it->start)) {
-        pqs_storage.insert_pqs_item(*left_it, res);
-        ++left_it;
-      } else {
-        pqs_storage.insert_pqs_item(*right_it, res);
-        ++right_it;
-      }
-    }
-    pqs_storage.export_pqs(res);
-
-  } else if (res_list.size() == 1) {
-    // single results, just copy
-    for (size_t i = 0; i < res_list[0].items.size(); ++i) {
-      res.items.push_back(res_list[0].items[i]);
-    }
-  }
-}
-
-
-/**
- * Possible split the PQS search between mutliple threads
- * 
- * @param subject
- * @param seq
- * @param run_re_c
- * @param sc
- * @param opts
- * @param res
- */
-void find_pqs_parallel(
-    SEXP subject,
-    const string &seq,
-    const boost::regex &run_re_c,
-    const scoring &sc,
-    const opts_t &opts,
-    results &res)
-{
-  if (opts.threads == 1 || opts.fast) {
-    find_pqs(subject, seq.begin(), seq.end(), run_re_c, sc, opts, res);
-  } else {
-    vector<seq_chunk_t> chunk_list = split_seq_to_chunks(seq, opts);
-    
-    size_t num_threads = min(chunk_list.size(), opts.threads);
-    std::thread *tt = NULL;
-    
-    // initialize result objects
-    vector<results> res_list;
-    for (size_t i = 0; i < chunk_list.size(); ++i) {
-      res_list.emplace_back(chunk_list[i].e - chunk_list[i].s, chunk_list[i].s, opts);
-    }
-    if (num_threads > 1) {
-      // run additional threads
-      tt = new std::thread[num_threads - 1];
-      for (size_t tid = 1; tid < num_threads; ++tid) {
-        tt[tid - 1] = std::thread(
-          std::bind(find_pqs_thread, tid, num_threads, std::ref(chunk_list), std::ref(res_list),
-          subject, std::ref(run_re_c), std::ref(sc), std::ref(opts))
-        );
-      }
-    }
-    // run main thread calculation
-    find_pqs_thread(0, num_threads, chunk_list, res_list, subject, run_re_c, sc, opts);
-    
-    if (tt != NULL) {
-      // wait for additional threads
-      for (size_t tid = 1; tid < num_threads; ++tid) {
-        tt[tid - 1].join();
-      }
-      delete [] tt;
-    }
-    merge_thread_results(chunk_list, res_list, res, opts);
   }
 }
 
@@ -1170,12 +944,12 @@ SEXP pqsfinder(
 
   if (strand == "+" || strand == "*") {
     Rcout << "Searching on sense strand..." << endl;
-    find_pqs_parallel(subject, seq, run_re_c, sc, opts, res_sense);
+    find_pqs(subject, seq.begin(), seq.end(), run_re_c, sc, opts, res_sense);
     Rcout << "Search status: finished              " << endl;
   }
   if (strand == "-" || strand == "*") {
     Rcout << "Searching on antisense strand..." << endl;
-    find_pqs_parallel(subject_rc, seq_rc, run_re_c, sc, opts, res_antisense);
+    find_pqs(subject, seq_rc.begin(), seq_rc.end(), run_re_c, sc, opts, res_antisense);
     Rcout << "Search status: finished              " << endl;
   }
 
