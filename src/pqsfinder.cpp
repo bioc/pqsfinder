@@ -877,6 +877,10 @@ SEXP pqsfinder(
     // cannot use optimization when searching for overlapping G4s
     opts.fast = false;
   }
+  if (!opts.use_default_scoring) {
+    // cannot use optimization when default scoring turned off
+    opts.fast = false;
+  }
   scoring sc;
   sc.tetrad_bonus = tetrad_bonus;
   sc.bulge_penalty = bulge_penalty;
