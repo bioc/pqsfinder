@@ -57,11 +57,12 @@ By default, `pqsfinder` function reports only the locally best non-overlapping P
 pqsfinder(seq, overlapping = TRUE)
 ```
 
-Alternatively, it's possible to get numbers of all overlapping PQS at each position of the input sequence. To achieve that, call `density(x)` function on the `PQSViews` object:[^2]
+Alternatively, it's possible to get numbers of all overlapping PQS at each position of the input sequence. To achieve that, set `deep` option to `TRUE` and then call `density(x)` function on the `PQSViews` object:[^2]
 
 [^2]: Clusters of overlapping PQS usually have steep edges when the number of neighboring G-runs is low, but could be more spread out in other situations. 
 
 ```{r density}
+pqs <- pqsfinder(seq, deep = TRUE)
 density(pqs)
 ```
 
@@ -106,7 +107,7 @@ The more you narrow these options in terms of shorter PQS length, narrower run o
 pqsfinder(seq, max_defects = 0)
 ```
 
-**Example 2:** In case you don't mind defects in G-runs, but you want to report only higher quality PQS, increase `min_score` value:
+**Example 2:** In case you don't mind defects in G-runs, but you want to report only high-quality PQS, increase `min_score` value:
 
 ```{r min_score, results='hold'}
 pqsfinder(seq, min_score = 70)
@@ -206,7 +207,7 @@ In the following example, we load the human genome from the `r Biocpkg('BSgenome
 4. Search for PQS on both strands.
 
     ```{r rwe_pqsfinder, results='hide'}
-    pqs <- pqsfinder(seq, min_score = 40)
+    pqs <- pqsfinder(seq, min_score = 40, deep = TRUE)
     ```
 
 5. Display the results.
@@ -251,7 +252,8 @@ In the following example, we load the human genome from the `r Biocpkg('BSgenome
 9. Show histogram for score distribution of detected PQS.
 
     ```{r rwe_hist, fig.height=4, fig.width=6}
-    qplot(score(pqs), geom = "histogram", main = "Histogram of PQS score", bins = 25)
+    sf <- data.frame(score = score(pqs))
+    ggplot(sf) + geom_histogram(mapping = aes(x = score), binwidth = 5)
     ```
 
 10. Show PQS score and density distribution along AHNAK gene annotation using `r Biocpkg('Gviz')` package.
