@@ -1,0 +1,3 @@
+#!/bin/sh
+
+rm -f src/boost_regex/*.o
