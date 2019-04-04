@@ -1,3 +1,20 @@
+CHANGES IN VERSION 2.0.x
+------------------------
+
+NEW FEATURES:
+
+    o The qsfinder algorithm is ~100 times faster on real-world sequences
+      than before. The main idea of the optimization is to stop the
+      exhaustive search when we are sure there can't be found better PQS.
+      The optimization is applied only in non-overlapping mode.
+    o New boolean argument called "deep". Once set to TRUE, pqsfinder will
+      disable optimizations and run full exhaustive search.
+
+BUG FIXES:
+
+    o Fixed resolution of overlapping sequences. When multiple same-scoring
+      PQS overlap, the shortest one is chosen.
+
 CHANGES IN VERSION 1.4.x
 ------------------------
 
