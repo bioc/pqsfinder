@@ -64,10 +64,10 @@ struct search_progress_t {
  */
 inline void print_pqs(const run_match m[], int score, const string::const_iterator ref)
 {
-  Rcout << m[0].first - ref + 1 << "-" << m[3].second - ref << " " << "[" << string(m[0].first, m[0].second) << "]";
+  Rcerr << m[0].first - ref + 1 << "-" << m[3].second - ref << " " << "[" << string(m[0].first, m[0].second) << "]";
   for (int i = 1; i < RUN_CNT; i++)
-    Rcout << string(m[i-1].second, m[i].first) << "[" << string(m[i].first, m[i].second) << "]";
-  Rcout << " " << score << endl;
+    Rcerr << string(m[i-1].second, m[i].first) << "[" << string(m[i].first, m[i].second) << "]";
+  Rcerr << " " << score << endl;
 }
 
 
@@ -76,10 +76,10 @@ inline void print_pqs(const run_match m[], int score, const string::const_iterat
  * 
  */
 inline void print_partial_pqs(const run_match m[], int i, const string::const_iterator ref) {
-  Rcout << m[0].first - ref + 1 << "-" << m[i].second - ref << " " << "[" << string(m[0].first, m[0].second) << "]";
+  Rcerr << m[0].first - ref + 1 << "-" << m[i].second - ref << " " << "[" << string(m[0].first, m[0].second) << "]";
   for (int k = 1; k <= i; k++)
-    Rcout << string(m[k-1].second, m[k].first) << "[" << string(m[k].first, m[k].second) << "]";
-  Rcout << endl;
+    Rcerr << string(m[k-1].second, m[k].first) << "[" << string(m[k].first, m[k].second) << "]";
+  Rcerr << endl;
 }
 
 
@@ -112,7 +112,7 @@ void count_g(std::string seq) {
   m.first = seq.begin();
   m.second = seq.end();
   int cnt = count_g_num(m);
-  Rcout << cnt << endl;
+  Rcerr << cnt << endl;
 }
 
 
@@ -507,7 +507,7 @@ void find_all_runs(
       search_progress_t sp = search_progress(start, ref, len, s_time);
       char buffer[10];
       sprintf(buffer, "%02d:%02d:%02d", sp.hours, sp.minutes, sp.seconds);
-      Rcout << "Search status: " << sp.percents << "% ETTC " << string(buffer) << "\r" << flush;
+      Rcerr << "Search status: " << sp.percents << "% ETTC " << string(buffer) << "\n" << flush;
     }
   }
 
@@ -554,7 +554,7 @@ void find_all_runs(
           - sc.loop_penalties[next_loop_sum];
         
         // print_partial_pqs(m, i, ref);
-        // Rcout << "next_tetrad_count: " << next_tetrad_count 
+        // Rcerr << "next_tetrad_count: " << next_tetrad_count 
         //       << " next_defect_count: " << next_defect_count
         //       << " max_scores[0]: " << res.scores.get(m[0].first)
         //       << " max_score: " << max_score
@@ -905,16 +905,16 @@ SEXP pqsfinder(
   boost::regex run_re_c(run_re);
 
   if (opts.debug) {
-    Rcout << "G-run regexp: " << run_re << endl;
-    Rcout << "Use regexp engine: " << opts.use_re << endl;
-    Rcout << "Input sequence length: " << seq.length() << endl;
-    Rcout << "Use user fn: " << (custom_scoring_fn != R_NilValue) << endl;
+    Rcerr << "G-run regexp: " << run_re << endl;
+    Rcerr << "Use regexp engine: " << opts.use_re << endl;
+    Rcerr << "Input sequence length: " << seq.length() << endl;
+    Rcerr << "Use user fn: " << (custom_scoring_fn != R_NilValue) << endl;
   }
 
   if (custom_scoring_fn != R_NilValue) {
     sc.set_custom_scoring_fn(custom_scoring_fn);
     if (opts.debug) {
-      Rcout << "User function: " << endl;
+      Rcerr << "User function: " << endl;
       Function show("show");
       show(custom_scoring_fn);
     }
@@ -925,14 +925,14 @@ SEXP pqsfinder(
   #endif
 
   if (strand == "+" || strand == "*") {
-    Rcout << "Searching on sense strand..." << endl;
+    Rcerr << "Searching on sense strand..." << endl;
     find_pqs(subject, seq.begin(), seq.end(), run_re_c, sc, opts, res_sense);
-    Rcout << "Search status: finished              " << endl;
+    Rcerr << "Search status: finished              " << endl;
   }
   if (strand == "-" || strand == "*") {
-    Rcout << "Searching on antisense strand..." << endl;
+    Rcerr << "Searching on antisense strand..." << endl;
     find_pqs(subject, seq_rc.begin(), seq_rc.end(), run_re_c, sc, opts, res_antisense);
-    Rcout << "Search status: finished              " << endl;
+    Rcerr << "Search status: finished              " << endl;
   }
 
   #ifdef GPERF_ENABLED
