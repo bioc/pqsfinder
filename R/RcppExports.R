@@ -16,7 +16,8 @@
 #'   DNAString object is assumed to encode the "+" strand.
 #' @param overlapping If true, than all overlapping PQS will be reported.
 #' @param max_len Maximal lenth of PQS.
-#' @param min_score Minimal PQS score.
+#' @param min_score Minimal PQS score. The default value 52 shows the best
+#' balanced accuracy on G4 sequencing data provided by Chambers et al. 2015.
 #' @param run_min_len Minimal length of quadruplex run.
 #' @param run_max_len Maximal length of quadruplex run.
 #' @param loop_min_len Minimal length of quadruplex loop. Unless the default scoring
@@ -70,7 +71,7 @@
 #' pv
 #' elementMetadata(pv)
 #'
-pqsfinder <- function(subject, strand = "*", overlapping = FALSE, max_len = 50L, min_score = 26L, run_min_len = 2L, run_max_len = 11L, loop_min_len = 0L, loop_max_len = 30L, max_bulges = 3L, max_mismatches = 3L, max_defects = 3L, tetrad_bonus = 40L, mismatch_penalty = 28L, bulge_penalty = 20L, bulge_len_factor = 0.2, bulge_len_exponent = 1, loop_mean_factor = 6.6, loop_mean_exponent = 0.8, run_re = "G{1,10}.{0,9}G{1,10}", custom_scoring_fn = NULL, use_default_scoring = TRUE, deep = FALSE, verbose = FALSE) {
+pqsfinder <- function(subject, strand = "*", overlapping = FALSE, max_len = 50L, min_score = 52L, run_min_len = 2L, run_max_len = 11L, loop_min_len = 0L, loop_max_len = 30L, max_bulges = 3L, max_mismatches = 3L, max_defects = 3L, tetrad_bonus = 40L, mismatch_penalty = 28L, bulge_penalty = 20L, bulge_len_factor = 0.2, bulge_len_exponent = 1, loop_mean_factor = 6.6, loop_mean_exponent = 0.8, run_re = "G{1,10}.{0,9}G{1,10}", custom_scoring_fn = NULL, use_default_scoring = TRUE, deep = FALSE, verbose = FALSE) {
     .Call('_pqsfinder_pqsfinder', PACKAGE = 'pqsfinder', subject, strand, overlapping, max_len, min_score, run_min_len, run_max_len, loop_min_len, loop_max_len, max_bulges, max_mismatches, max_defects, tetrad_bonus, mismatch_penalty, bulge_penalty, bulge_len_factor, bulge_len_exponent, loop_mean_factor, loop_mean_exponent, run_re, custom_scoring_fn, use_default_scoring, deep, verbose)
 }
 

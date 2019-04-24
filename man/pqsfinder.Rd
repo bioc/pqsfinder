@@ -5,7 +5,7 @@
 \title{Identify potential quadruplex forming sequences.}
 \usage{
 pqsfinder(subject, strand = "*", overlapping = FALSE, max_len = 50L,
-  min_score = 26L, run_min_len = 2L, run_max_len = 11L,
+  min_score = 52L, run_min_len = 2L, run_max_len = 11L,
   loop_min_len = 0L, loop_max_len = 30L, max_bulges = 3L,
   max_mismatches = 3L, max_defects = 3L, tetrad_bonus = 40L,
   mismatch_penalty = 28L, bulge_penalty = 20L,
@@ -25,7 +25,8 @@ DNAString object is assumed to encode the "+" strand.}
 
 \item{max_len}{Maximal lenth of PQS.}
 
-\item{min_score}{Minimal PQS score.}
+\item{min_score}{Minimal PQS score. The default value 52 shows the best
+balanced accuracy on G4 sequencing data provided by Chambers et al. 2015.}
 
 \item{run_min_len}{Minimal length of quadruplex run.}
 

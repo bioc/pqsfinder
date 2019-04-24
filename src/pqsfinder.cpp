@@ -732,7 +732,8 @@ void find_pqs(
 //'   DNAString object is assumed to encode the "+" strand.
 //' @param overlapping If true, than all overlapping PQS will be reported.
 //' @param max_len Maximal lenth of PQS.
-//' @param min_score Minimal PQS score.
+//' @param min_score Minimal PQS score. The default value 52 shows the best
+//' balanced accuracy on G4 sequencing data provided by Chambers et al. 2015.
 //' @param run_min_len Minimal length of quadruplex run.
 //' @param run_max_len Maximal length of quadruplex run.
 //' @param loop_min_len Minimal length of quadruplex loop. Unless the default scoring
@@ -792,7 +793,7 @@ SEXP pqsfinder(
     std::string strand = "*",
     bool overlapping = false,
     int max_len = 50,
-    int min_score = 26,
+    int min_score = 52,
     int run_min_len = 2,
     int run_max_len = 11,
     int loop_min_len = 0,
