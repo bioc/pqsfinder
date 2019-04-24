@@ -10,6 +10,12 @@ NEW FEATURES:
     o New boolean argument called "deep". Once set to TRUE, pqsfinder will
       disable optimizations and run full exhaustive search.
 
+SIGNIFICANT USER-VISIBLE CHANGES:
+
+    o Default minimal PQS score was increased from 26 to 52. The score 52
+      shows the best balanced accuracy on G4 sequencing data provided by
+      Chambers et al. 2015.
+
 BUG FIXES:
 
     o Fixed resolution of overlapping sequences. When multiple same-scoring
