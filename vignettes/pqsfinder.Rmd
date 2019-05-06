@@ -25,7 +25,7 @@ It is important to note that unlike many other approaches, our algorithm is able
 
 For those interested in non-B DNA, we have previously authored a similar package that can be used to search for triplexes, another type of non-B DNA structure. For details, please see `r Biocpkg('triplex')` package landing page.
 
-# G4-quadruplex detection
+# G-quadruplex detection
 
 As usual, before first package use, it is necessary to load the `r Biocpkg("pqsfinder")` package using the following command:
 
@@ -41,11 +41,11 @@ As a simple example, let's find all PQS in a short DNA sequence.
 
 ```{r basic_detection, results='hold'}
 seq <- DNAString("TTTTGGGCGGGAGGAGTGGAGTTTTTAACCCCAAAAATTTGGGAGGGTGGGTGGGAGAA")
-pqs <- pqsfinder(seq)
+pqs <- pqsfinder(seq, min_score = 20)
 pqs
 ```
 
-Detected PQS are returned in the form of a `PQSViews` class, which represents the basic container for storing a set of views on the same input sequence based on `XStringViews` object from `r Biocpkg("Biostrings")` package. Each PQS in the view is defined by (i) start location, (ii) width, (iii) score, (iv) strand, (v) number of G-tetrads `nt`, (vi) number of bulges `nb` and (vii) number of mismatches `nm`. The first four values can be accessed by standard functions `start(x)`, `width(x)` and `score(x)` and `strand(x)`. To get other PQS features, please use `elementMetadata(x)` function. It additionaly provides loop lengths of the detected PQS (`ll1`, `ll2`, `ll3`).
+Detected PQS are returned in the form of a `PQSViews` class, which represents the basic container for storing a set of views on the same input sequence based on `XStringViews` object from `r Biocpkg("Biostrings")` package. Each PQS in the view is defined by (i) start location, (ii) width, (iii) score, (iv) strand, (v) number of G-tetrads `nt`, (vi) number of bulges `nb` and (vii) number of mismatches `nm`. The first four values can be accessed by standard functions `start(x)`, `width(x)` and `score(x)` and `strand(x)`. To get other PQS features, please use `elementMetadata(x)` function. It additionaly provides run and loop lengths of the detected PQS (`rl1`, `rl2`, `rl3`, `ll1`, `ll2`, `ll3`).
 
 ```{r accessors}
 elementMetadata(pqs)
@@ -54,7 +54,7 @@ elementMetadata(pqs)
 By default, `pqsfinder` function reports only the locally best non-overlapping PQS, ignoring any other that would overlap it. However, it's possible to change the default behavior by setting the `overlapping` option to `TRUE`.
 
 ```{r overlapping}
-pqsfinder(seq, overlapping = TRUE)
+pqsfinder(seq, overlapping = TRUE, min_score = 30)
 ```
 
 Alternatively, it's possible to get numbers of all overlapping PQS at each position of the input sequence. To achieve that, set `deep` option to `TRUE` and then call `density(x)` function on the `PQSViews` object:[^2]
@@ -62,7 +62,7 @@ Alternatively, it's possible to get numbers of all overlapping PQS at each posit
 [^2]: Clusters of overlapping PQS usually have steep edges when the number of neighboring G-runs is low, but could be more spread out in other situations. 
 
 ```{r density}
-pqs <- pqsfinder(seq, deep = TRUE)
+pqs <- pqsfinder(seq, deep = TRUE, min_score = 20)
 density(pqs)
 ```
 
@@ -88,7 +88,7 @@ Option name      | Description
 `strand`         | Strand specification (`+`, `-` or `*`).
 `overlapping`    | If true, than overlapping PQS will be reported.
 `max_len`        | Maximal total length of PQS.
-`min_score`      | Minimal score of PQS to be reported.
+`min_score`      | Minimal score of PQS to be reported. The default value 52 shows the best balanced accuracy on human G4 sequencing data [@chambers_2015].
 `run_min_len`    | Minimal length of each PQS run (G-run).
 `run_max_len`    | Maximal length of each PQS run.
 `loop_min_len`   | Minimal length of each PQS inner loop.
@@ -104,7 +104,7 @@ The more you narrow these options in terms of shorter PQS length, narrower run o
 **Example 1:** If you are insterested solely in G-quadruplexes with perfect G-runs, just restrict `max_defects` to zero:
 
 ```{r perfect_g4, results='hold'}
-pqsfinder(seq, max_defects = 0)
+pqsfinder(seq, max_defects = 0, min_score = 20)
 ```
 
 **Example 2:** In case you don't mind defects in G-runs, but you want to report only high-quality PQS, increase `min_score` value:
@@ -207,7 +207,7 @@ In the following example, we load the human genome from the `r Biocpkg('BSgenome
 4. Search for PQS on both strands.
 
     ```{r rwe_pqsfinder, results='hide'}
-    pqs <- pqsfinder(seq, min_score = 40, deep = TRUE)
+    pqs <- pqsfinder(seq, deep = TRUE)
     ```
 
 5. Display the results.
