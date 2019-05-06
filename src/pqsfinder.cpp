@@ -987,12 +987,17 @@ SEXP pqsfinder(
     res_nt[i] = res_antisense.items[k].nt;
     res_nb[i] = res_antisense.items[k].nb;
     res_nm[i] = res_antisense.items[k].nm;
-    res_rl1[i] = res_antisense.items[k].rl1;
-    res_rl2[i] = res_antisense.items[k].rl2;
-    res_rl3[i] = res_antisense.items[k].rl3;
-    res_ll1[i] = res_antisense.items[k].ll1;
+    
+    res_rl2[i] = res_antisense.items[k].rl3;
+    res_rl3[i] = res_antisense.items[k].rl2;
+    
+    res_ll1[i] = res_antisense.items[k].ll3;
     res_ll2[i] = res_antisense.items[k].ll2;
-    res_ll3[i] = res_antisense.items[k].ll3;
+    res_ll3[i] = res_antisense.items[k].ll1;
+    
+    res_rl1[i] = res_width[i] - (
+      res_ll1[i] + res_rl2[i] + res_ll2[i] + res_rl3[i] + res_ll3[i] + res_antisense.items[k].rl1
+      );
     ++i;
   }
   
