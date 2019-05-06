@@ -25,7 +25,7 @@ LazyData: TRUE
 Depends: Biostrings
 Imports: Rcpp (>= 0.12.3), GenomicRanges, IRanges, S4Vectors, methods
 Suggests: BiocStyle, knitr, Gviz, rtracklayer, ggplot2,
-        BSgenome.Hsapiens.UCSC.hg38, testthat, stringr
+        BSgenome.Hsapiens.UCSC.hg38, testthat, stringr, stringi
 LinkingTo: Rcpp, BH (>= 1.69.0)
 SystemRequirements: GNU make, C++11
 VignetteBuilder: knitr
