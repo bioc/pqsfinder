@@ -25,10 +25,10 @@
     max_scores = "integer"
   ),
   validity = function(object) {
-    if (!is.na(object@density) && length(object@subject) != length(object@density) ) {
+    if (!is.na(object@density[1]) && length(object@subject) != length(object@density) ) {
       return("Length of the density vector is not equal to the length of the subject.")
     }
-    if (!is.na(object@max_scores) && length(object@subject) != length(object@max_scores)) {
+    if (!is.na(object@max_scores[1]) && length(object@subject) != length(object@max_scores)) {
       return("Length of the score distribution vector is not equal to the length of the subject.")
     }
     return(TRUE)
