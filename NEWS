@@ -20,6 +20,8 @@ BUG FIXES:
 
     o Fixed resolution of overlapping sequences. When multiple same-scoring
       PQS overlap, the shortest one is chosen.
+    o Fixed incorrect PQS metadata. When PQS was found on antisense strand,
+      corresponding run lengths and loop lengths were confused.
 
 CHANGES IN VERSION 1.4.x
 ------------------------
