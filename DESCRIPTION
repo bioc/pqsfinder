@@ -3,6 +3,7 @@ Type: Package
 Title: Identification of potential quadruplex forming sequences
 Version: 2.1.1
 Date: 2017-04-12
+URL: https://pqsfinder.fi.muni.cz
 Authors@R: c(person("Jiri", "Hon", role = c("aut", "cre"), email =
         "jiri.hon@gmail.com"), person("Dominika", "Labudova",
         role = "aut", email = "d.labudova@gmail.com"),
@@ -29,6 +30,6 @@ Suggests: BiocStyle, knitr, Gviz, rtracklayer, ggplot2,
 LinkingTo: Rcpp, BH (>= 1.69.0)
 SystemRequirements: GNU make, C++11
 VignetteBuilder: knitr
-RoxygenNote: 6.1.1
+RoxygenNote: 6.1.2
 Encoding: UTF-8
 NeedsCompilation: yes
