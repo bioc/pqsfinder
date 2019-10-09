@@ -46,7 +46,7 @@
 #' Use \code{\link{elementMetadata}} function to get extra PQS features
 #' like number of tetrads, bulges, mismatches or loop lengths.
 #'
-#' @param subject DNAString object.
+#' @param subject DNAString or RNAString object.
 #' @param start Start positions.
 #' @param width Lengths.
 #' @param strand Strand specifications.
@@ -208,7 +208,7 @@ setMethod('maxScores', 'PQSViews', function(x) x@max_scores)
 ##
 .show_vframe_line <- function(x, i, iW, cols)
 {
-  # Print triplex index
+  # Print PQS index
   cat(format(paste("[", i,"]", sep=""), width=iW, justify="right"))
 
   colW <- 0 # Sum of all column width
@@ -269,10 +269,6 @@ setMethod('maxScores', 'PQSViews', function(x) x@max_scores)
     list(nm="nt", fn=".get_nt"),
     list(nm="nb", fn=".get_nb"),
     list(nm="nm", fn=".get_nm")
-    # list(nm="ll1", fn=".get_ll1"),
-    # list(nm="ll2", fn=".get_ll2"),
-    # list(nm="ll3", fn=".get_ll3")
-    # list(nm="pvalue", fn="pvalue", scientific=TRUE, digits=2),
   )
 
   i <- 1
@@ -332,39 +328,44 @@ setMethod("show", "PQSViews", function(object)
 })
 
 
+## Set names for XStringSet
+##
+.get_xstring_names <- function(from) {
+  xstring_names <- sprintf(
+    "pqsfinder;G_quartet;start=%s;end=%s;strand=%s;score=%s;nt=%s;nb=%s;nm=%s;rl1=%s;rl2=%s;rl3=%s;ll1=%s;ll2=%s;ll3=%s;",
+    start(from), end(from), strand(from), score(from),
+    .get_nt(from), .get_nb(from), .get_nm(from),
+    .get_rl1(from), .get_rl2(from), .get_rl3(from),
+    .get_ll1(from), .get_ll2(from), .get_ll3(from)
+  )
+  return(xstring_names)
+}
+
+
 ###
-## Coerce TriplexViews to DNAStringSet
+## Coerce PQSViews to DNAStringSet
 ##
 setAs("PQSViews", "DNAStringSet", function(from)
 {
   s <- DNAStringSet(subject(from), start(from), end(from))
-
-  for (i in 1:length(s))
-  {# Set proper names
-    names(s)[i] <- paste(
-      "pqsfinder;G_quartet;",
-      "start=", start(from)[i], ";",
-      "end=", end(from)[i], ";",
-      "strand=", strand(from)[i], ";",
-      "score=", score(from)[i], ";",
-      "nt=", .get_nt(from)[i], ";",
-      "nb=", .get_nb(from)[i], ";",
-      "nm=", .get_nm(from)[i], ";",
-      "rl1=", .get_rl1(from)[i], ";",
-      "rl2=", .get_rl2(from)[i], ";",
-      "rl3=", .get_rl3(from)[i], ";",
-      "ll1=", .get_ll1(from)[i], ";",
-      "ll2=", .get_ll2(from)[i], ";",
-      "ll3=", .get_ll3(from)[i], ";",
-      sep=""
-    )
-  }
+  names(s) <- .get_xstring_names(from)
   return(s)
 })
 
 
 ###
-## Coerce TriplexViews to GRanges
+## Coerce PQSViews to RNAStringSet
+##
+setAs("PQSViews", "RNAStringSet", function(from)
+{
+  s <- RNAStringSet(subject(from), start(from), end(from))
+  names(s) <- .get_xstring_names(from)
+  return(s)
+})
+
+
+###
+## Coerce PQSViews to GRanges
 ##
 setAs("PQSViews", "GRanges", function(from)
 {
@@ -402,7 +403,11 @@ setAs("PQSViews", "GRanges", function(from)
 #'
 setMethod("as.character", "PQSViews", function(x)
 {
-  s <- as(x, "DNAStringSet")
+  if (class(subject(x)) == "DNAString") {
+    s <- as(x, "DNAStringSet")
+  } else {
+    s <- as(x, "RNAStringSet")
+  }
   as.character(s)
 })
 

@@ -445,7 +445,7 @@ inline search_progress_t search_progress(
 /**
  * Recursively idetify 4 consecutive runs making quadruplex
  *
- * @param subject DNAString object
+ * @param subject DNAString or RNAString object
  * @param i Odinal number of quadruplex run
  * @param start Start position for the current run
  * @param end Limit end position for the current run
@@ -677,7 +677,7 @@ void find_overscored(
 /**
  * Perform quadruplex search on given DNA sequence.
  *
- * @param subject DNAString object
+ * @param subject DNAString or RNAString object
  * @param seq_begin Beginning of DNA sequence
  * @param seq_end End of DNA sequence
  * @param run_re_c Run regular expression
@@ -726,7 +726,7 @@ void find_pqs(
 //' like number of tetrads (nt), bulges (nb), mismatches (nm) or loop lengths
 //' (ll1, ll2, ll3).
 //'
-//' @param subject DNAString object.
+//' @param subject DNAString or RNAString object.
 //' @param strand Strand specification. Allowed values are "+", "-" or "*",
 //'   where the last one represents both strands. Implicitly, the input
 //'   DNAString object is assumed to encode the "+" strand.
@@ -752,7 +752,7 @@ void find_pqs(
 //' @param loop_mean_exponent Exponent of loop length mean.
 //' @param run_re Regular expression specifying one run of quadruplex.
 //' @param custom_scoring_fn Custom quadruplex scoring function. It takes the
-//'   following 10 arguments: \code{subject} - Input DNAString object,
+//'   following 10 arguments: \code{subject} - Input DNAString or RNAString object,
 //'   \code{score} - implicit PQS score, \code{start} - PQS start position,
 //'   \code{width} - PQS width, \code{loop_1} - start pos. of loop #1,
 //'   \code{run_2} - start pos. of run #2, \code{loop_2} - start pos. of loop
@@ -783,7 +783,7 @@ void find_pqs(
 //' @return \code{\link{PQSViews}} object
 //'
 //' @examples
-//' pv <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGTAAAA"))
+//' pv <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGGTAAAA"))
 //' pv
 //' elementMetadata(pv)
 //'
@@ -848,8 +848,8 @@ SEXP pqsfinder(
 
   CharacterVector subject_class = as_character(get_class(subject));
 
-  if (subject_class[0] != "DNAString")
-    throw invalid_argument("Subject must be DNAString object.");
+  if (subject_class[0] != "DNAString" && subject_class[0] != "RNAString")
+    throw invalid_argument("Subject must be DNAString or RNAString object.");
   
   opts_t opts;
   opts.use_re = false;

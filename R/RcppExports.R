@@ -10,7 +10,7 @@
 #' like number of tetrads (nt), bulges (nb), mismatches (nm) or loop lengths
 #' (ll1, ll2, ll3).
 #'
-#' @param subject DNAString object.
+#' @param subject DNAString or RNAString object.
 #' @param strand Strand specification. Allowed values are "+", "-" or "*",
 #'   where the last one represents both strands. Implicitly, the input
 #'   DNAString object is assumed to encode the "+" strand.
@@ -36,7 +36,7 @@
 #' @param loop_mean_exponent Exponent of loop length mean.
 #' @param run_re Regular expression specifying one run of quadruplex.
 #' @param custom_scoring_fn Custom quadruplex scoring function. It takes the
-#'   following 10 arguments: \code{subject} - Input DNAString object,
+#'   following 10 arguments: \code{subject} - Input DNAString or RNAString object,
 #'   \code{score} - implicit PQS score, \code{start} - PQS start position,
 #'   \code{width} - PQS width, \code{loop_1} - start pos. of loop #1,
 #'   \code{run_2} - start pos. of run #2, \code{loop_2} - start pos. of loop
@@ -67,7 +67,7 @@
 #' @return \code{\link{PQSViews}} object
 #'
 #' @examples
-#' pv <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGTAAAA"))
+#' pv <- pqsfinder(DNAString("CCCCCCGGGTGGGTGGGTGGGTAAAA"))
 #' pv
 #' elementMetadata(pv)
 #'
