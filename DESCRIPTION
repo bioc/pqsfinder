@@ -1,7 +1,7 @@
 Package: pqsfinder
 Type: Package
 Title: Identification of potential quadruplex forming sequences
-Version: 2.1.2
+Version: 2.1.3
 Date: 2017-04-12
 URL: https://pqsfinder.fi.muni.cz
 Authors@R: c(person("Jiri", "Hon", role = c("aut", "cre"), email =
@@ -13,7 +13,7 @@ Authors@R: c(person("Jiri", "Hon", role = c("aut", "cre"), email =
 Author: Jiri Hon, Dominika Labudova, Matej Lexa and Tomas Martinek
 Maintainer: Jiri Hon <jiri.hon@gmail.com>
 Description: Pqsfinder detects
-        DNA sequence patterns that are likely to fold into an
+        DNA and RNA sequence patterns that are likely to fold into an
         intramolecular G-quadruplex (G4). Unlike many other approaches,
         pqsfinder is able to detect G4s
         folded from imperfect G-runs containing bulges or mismatches
