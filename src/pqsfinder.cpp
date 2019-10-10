@@ -533,6 +533,12 @@ void find_all_runs(
       s = string::const_iterator(m[i].first);
       e = string::const_iterator(m[i].second);
       
+      if (i > 0) {
+        loop_len = s - m[i-1].second;
+        if (loop_len > opts.loop_max_len) {
+          return; // skip too long loops
+        }
+      }
       if (opts.fast) {
         
         if (m[i].length() == m[i].g_count + 1) {
@@ -573,10 +579,6 @@ void find_all_runs(
           s_time, next_tetrad_count, next_defect_count, next_loop_sum, fn_call_count, show_progress
         );
       } else if (i < 3) {
-        loop_len = s - m[i-1].second;
-        if (loop_len > opts.loop_max_len) {
-          return; // skip too long loops
-        }
         find_all_runs(
           subject, i+1, e, end, m, run_re_c, opts, sc, ref, len,
           pqs_storage, int_cnt, res, (loop_len == 0 ? true : zero_loop),
