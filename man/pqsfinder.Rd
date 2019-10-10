@@ -98,7 +98,7 @@ assigned to the particular PQS by all applied scoring functions.}
 }
 \description{
 Function for identification of all potential intramolecular quadruplex
-patterns (PQS) in DNA sequence.
+patterns (PQS) in DNA or RNA sequence.
 }
 \details{
 Use \code{\link{elementMetadata}} function to get extra PQS features

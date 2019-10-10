@@ -4,7 +4,7 @@
 #' Identify potential quadruplex forming sequences.
 #'
 #' Function for identification of all potential intramolecular quadruplex
-#' patterns (PQS) in DNA sequence.
+#' patterns (PQS) in DNA or RNA sequence.
 #' 
 #' Use \code{\link{elementMetadata}} function to get extra PQS features
 #' like number of tetrads (nt), bulges (nb), mismatches (nm) or loop lengths
