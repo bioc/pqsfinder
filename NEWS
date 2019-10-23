@@ -1,3 +1,17 @@
+CHANGES IN VERSION 2.2.x
+------------------------
+
+SIGNIFICANT USER-VISIBLE CHANGES:
+
+    o Default minimal PQS score was decreased from 52 to 47. The score 47
+      shows the best balanced accuracy on new G4 sequencing data provided
+      by Marsico et al. 2019.
+      
+BUG FIXES:
+
+    o Fixed bug allowing unlimited length of third loop leading to 
+      invalid memory access and random scores.
+
 CHANGES IN VERSION 2.0.x
 ------------------------
 
