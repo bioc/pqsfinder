@@ -1,7 +1,7 @@
 Package: pqsfinder
 Type: Package
 Title: Identification of potential quadruplex forming sequences
-Version: 2.8.0
+Version: 2.9.0
 Date: 2017-04-12
 URL: https://pqsfinder.fi.muni.cz
 Authors@R: c(person("Jiri", "Hon", role = c("aut", "cre"), email =
