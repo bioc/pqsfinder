@@ -27,9 +27,9 @@ Depends: Biostrings
 Imports: Rcpp (>= 0.12.3), GenomicRanges, IRanges, S4Vectors, methods
 Suggests: BiocStyle, knitr, rmarkdown, Gviz, rtracklayer, ggplot2,
         BSgenome.Hsapiens.UCSC.hg38, testthat, stringr, stringi
-LinkingTo: Rcpp, BH (>= 1.69.0)
+LinkingTo: Rcpp, BH (>= 1.78.0)
 SystemRequirements: GNU make, C++11
 VignetteBuilder: knitr
-RoxygenNote: 6.1.2
+RoxygenNote: 7.1.2
 Encoding: UTF-8
 NeedsCompilation: yes

@@ -4,8 +4,24 @@
 \alias{PQSViews}
 \title{PQSViews class constructor}
 \usage{
-PQSViews(subject, start, width, strand, score, density, max_scores, nt, nb,
-  nm, rl1, rl2, rl3, ll1, ll2, ll3)
+PQSViews(
+  subject,
+  start,
+  width,
+  strand,
+  score,
+  density,
+  max_scores,
+  nt,
+  nb,
+  nm,
+  rl1,
+  rl2,
+  rl3,
+  ll1,
+  ll2,
+  ll3
+)
 }
 \arguments{
 \item{subject}{DNAString or RNAString object.}

@@ -5,6 +5,11 @@
 
 using namespace Rcpp;
 
+#ifdef RCPP_USE_GLOBAL_ROSTREAM
+Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
+Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
+#endif
+
 // pqsfinder
 SEXP pqsfinder(SEXP subject, std::string strand, bool overlapping, int max_len, int min_score, int run_min_len, int run_max_len, int loop_min_len, int loop_max_len, int max_bulges, int max_mismatches, int max_defects, int tetrad_bonus, int mismatch_penalty, int bulge_penalty, double bulge_len_factor, double bulge_len_exponent, double loop_mean_factor, double loop_mean_exponent, std::string run_re, SEXP custom_scoring_fn, bool use_default_scoring, bool deep, bool verbose);
 RcppExport SEXP _pqsfinder_pqsfinder(SEXP subjectSEXP, SEXP strandSEXP, SEXP overlappingSEXP, SEXP max_lenSEXP, SEXP min_scoreSEXP, SEXP run_min_lenSEXP, SEXP run_max_lenSEXP, SEXP loop_min_lenSEXP, SEXP loop_max_lenSEXP, SEXP max_bulgesSEXP, SEXP max_mismatchesSEXP, SEXP max_defectsSEXP, SEXP tetrad_bonusSEXP, SEXP mismatch_penaltySEXP, SEXP bulge_penaltySEXP, SEXP bulge_len_factorSEXP, SEXP bulge_len_exponentSEXP, SEXP loop_mean_factorSEXP, SEXP loop_mean_exponentSEXP, SEXP run_reSEXP, SEXP custom_scoring_fnSEXP, SEXP use_default_scoringSEXP, SEXP deepSEXP, SEXP verboseSEXP) {
