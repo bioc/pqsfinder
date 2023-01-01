@@ -209,8 +209,8 @@ test_that("the shortest possible between same-scoring PQS is found", {
 
 test_that("sequences pqs parts can be extracted", {
   library(stringr)
-  test_seq <- DNAString("GGGTAGTGGTTTTGGGTTTGGGAAAAAAAAAAAAAAGGGTTTGGAGGAAATTTGGGGAGGGG")
-  pv <- pqsfinder(test_seq, strand = "+", min_score = 26)
+  test_seq <- "GGGTAGTGGTTTTGGGTTTGGGAAAAAAAAAAAAAAGGGTTTGGAGGAAATTTGGGGAGGGG"
+  pv <- pqsfinder(DNAString(test_seq), strand = "+", min_score = 26)
   pv_m <- elementMetadata(pv)
   
   r1_s <- start(pv)
